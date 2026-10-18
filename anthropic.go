@@ -352,7 +352,6 @@ func anthropicStop(reason anthropic.StopReason) StopReason {
 // path as a request the model made. So the fragments are judged as they
 // arrived instead: a block that received argument bytes that do not parse is
 // a call the ceiling landed inside of, and it is dropped.
-// See docs/capabilities/providers.md#a-reply-says-why-it-stopped.
 func anthropicWholeCalls(accumulated anthropic.Message, fragments map[int64]*strings.Builder) []ToolCall {
 	var calls []ToolCall
 	for i, block := range accumulated.Content {
@@ -619,7 +618,6 @@ func anthropicOutputFormat(raw json.RawMessage) anthropic.JSONOutputFormatParam 
 // system prompt in what the API hashes, so a request without them shares no
 // prefix with the session's other requests and rebuilds the whole head. The
 // choice itself is not part of that prefix (cache.go).
-// See docs/capabilities/providers.md#the-prompt-prefix-is-paid-for-once.
 func toAnthropicToolChoice(choice string) (anthropic.ToolChoiceUnionParam, bool) {
 	switch choice {
 	case ToolChoiceAuto:

@@ -27,7 +27,6 @@ package llm
 // one provider's own. The positions have to be the same on both, so they are
 // chosen once here and applied twice — a rule written down twice is a rule
 // that gets corrected once.
-// See docs/capabilities/providers.md#the-prompt-prefix-is-paid-for-once.
 
 import (
 	"bytes"

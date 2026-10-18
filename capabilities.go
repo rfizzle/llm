@@ -4,8 +4,7 @@ package llm
 // model-data table first — fetched, current, and the same file that prices
 // the session — and from a by-family floor for the models the table has not
 // caught up with, so a brand-new model is sent the shape its family takes
-// rather than nothing
-// (docs/capabilities/providers.md#model-data-is-fetched-and-a-snapshot-ships).
+// rather than nothing.
 
 import "strings"
 

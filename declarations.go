@@ -6,7 +6,6 @@ package llm
 // as a whole or scoped to one flow, the bounded call that builds the request.
 // The flow is named on the request by the code that builds it, so the
 // provider never guesses which call it is serving.
-// See docs/capabilities/providers.md#a-bounded-call-asks-for-the-shape-of-its-answer.
 
 import (
 	"fmt"
@@ -118,7 +117,6 @@ var declarations = []Declaration{{
 	// nothing a request carries: the marks still go out, because a marked
 	// request to an endpoint without a cache costs what it would have cost
 	// and says what it would have said.
-	// See docs/capabilities/providers.md#the-session-says-whether-the-cache-worked.
 	Key:      KeyPromptCache,
 	Unscoped: "caching is a property of the endpoint, not of a call",
 	// There is no true: an endpoint's cache is read off its responses,

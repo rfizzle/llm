@@ -44,7 +44,6 @@ type ProviderDefaults struct {
 	// avoidable cost. Empty means the provider has no small model anyone can
 	// name ahead of time — a local endpoint serves whatever was loaded — and
 	// those calls fall back to the session model.
-	// See docs/capabilities/providers.md#a-bounded-call-runs-on-the-small-model.
 	CheapModel string
 }
 

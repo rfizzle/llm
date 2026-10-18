@@ -13,7 +13,6 @@ package llm
 // reads, and a deadline that expires cancels the request and ends the turn as
 // a network failure — which is a class the retry schedule already waits out
 // and asks again (retry.go in internal/agent).
-// See docs/capabilities/providers.md#a-stream-that-stops-writing-is-a-failure.
 
 import (
 	"context"

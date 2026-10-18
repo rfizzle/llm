@@ -142,7 +142,6 @@ var errBadIDToken = errors.New("the ChatGPT sign-in returned an ID token that do
 // type: an `alg` the token chooses for itself is how `none` and HMAC-with-
 // the-public-key forgeries get in. A key is found by kid; a token without
 // one is tried against every key of its type.
-// See docs/capabilities/chatgpt-plan.md#what-the-sign-in-checks.
 func verifyIDToken(raw string, keys []jwk, clientID, nonce string, now time.Time) (idClaims, error) {
 	parts := strings.Split(raw, ".")
 	if len(parts) != 3 {

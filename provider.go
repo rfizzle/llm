@@ -39,7 +39,6 @@ type Message struct {
 	// the draft. It is stored beside the message, because a conversation
 	// read back out of the store would otherwise credit all of it to the
 	// reader.
-	// See docs/capabilities/sessions-and-memory.md#a-message-the-session-wrote-stays-the-sessions.
 	Machine bool
 	// MachineKind says which machine message this is, for the one reader that
 	// has to tell them apart: the rebuild of a transcript, which draws each
@@ -48,7 +47,6 @@ type Message struct {
 	// person's message, and a message stored before the kind was — which is
 	// why the rebuild keeps a match on the built-in words behind it for those.
 	// Nothing on the wire reads it; it is stored beside the message.
-	// See docs/interface/surfaces.md#the-progress-checkpoint.
 	MachineKind MachineKind
 	// Turn and Round are where in the session the message was written: the
 	// user turn, and the tool round within it. Nothing on the wire reads
@@ -59,7 +57,6 @@ type Message struct {
 	// tables, and without a position on one side there is nothing to match
 	// on. Zero on both is "no position recorded", which is what a message
 	// stored before the columns existed reads as.
-	// See docs/capabilities/sessions-and-memory.md#a-round-can-be-read-back.
 	Turn, Round int64
 	// Checkpoint marks assistant prose that was the public status a long,
 	// otherwise silent run had been asked for. Nothing on the wire reads it —
@@ -68,7 +65,6 @@ type Message struct {
 	// an answer. It is stored beside the message because a conversation read
 	// back out of the store would otherwise promote every note in it to an
 	// answer the moment the session was reopened.
-	// See docs/interface/surfaces.md#the-progress-checkpoint.
 	Checkpoint bool
 	// Value is what a tool result carries beside its text, as the tool
 	// that wrote it encoded it (value.go): the quality gate's reading of
@@ -115,7 +111,6 @@ type ToolCall struct {
 // all on the terminal event, which is the only place any of them is complete.
 // A reader that treated a fragment as a call would be reading half-written
 // JSON — the failure partial.go exists to prevent.
-// See docs/capabilities/providers.md#tool-arguments-arrive-as-fragments.
 type ToolCallDelta struct {
 	ID        string
 	Arguments string
@@ -138,7 +133,7 @@ type Usage struct {
 	//
 	// They are separate because they are priced apart: a read is a fraction
 	// of the input rate and a write is a premium over it.
-	// See docs/capabilities/providers.md#the-prompt-prefix-is-paid-for-once.
+	// See the README's "Price a Usage" section.
 	CachedTokens        int
 	CacheCreationTokens int
 	// CacheCreation5m and CacheCreation1h split CacheCreationTokens by the
@@ -243,21 +238,18 @@ type StreamEvent struct {
 	// the terminal event, unchanged; a fragment is never dispatched, stored
 	// or replayed, and a stream that breaks mid-fragment still hands back
 	// only the calls that are whole (partial.go).
-	// See docs/capabilities/providers.md#tool-arguments-arrive-as-fragments.
 	ToolCallDelta *ToolCallDelta
 	// Keepalive marks a comment or ping a gateway sent to hold the connection
 	// open. It carries nothing else: no text, no fragment, nothing stored or
 	// drawn. It exists so a surface can tell a live stream that is quiet from
 	// one that has said nothing at all; every other reader counts it as an
 	// event and ignores it.
-	// See docs/capabilities/providers.md#a-stream-that-stops-writing-is-a-failure.
 	Keepalive bool
 	// Stop is why the model stopped writing, on the terminal event and
 	// nowhere else. The empty value is a stream that ended without saying —
 	// a gateway that dropped the field, an event the parser never reached —
 	// and it reads as StopEnd everywhere, because that is what every reader
 	// assumed before there was a field at all.
-	// See docs/capabilities/providers.md#a-reply-says-why-it-stopped.
 	Stop StopReason
 }
 
@@ -271,7 +263,6 @@ type StreamEvent struct {
 // nothing. What a caller does about an ending is what earns it a name here:
 // a reply that is finished, one that is owed tool results, one that was cut
 // off mid-sentence and can be continued, and one the model declined to give.
-// See docs/capabilities/providers.md#a-reply-says-why-it-stopped.
 type StopReason string
 
 const (
@@ -348,7 +339,6 @@ type CompletionOpts struct {
 	// converter is where they are made to agree. Those two are the whole set
 	// a caller may send: every provider honours both, and a value outside
 	// them is one some dialects forward and others quietly drop.
-	// See docs/capabilities/providers.md#a-request-says-whether-a-tool-may-be-called.
 	ToolChoice string
 	// Effort is the reasoning level asked of the model (
 	// reasoning.go). EffortOff — the zero value — sends nothing.
@@ -360,13 +350,11 @@ type CompletionOpts struct {
 	//
 	// A request may carry a schema or offer tools, never both — see
 	// SchemaFor for what happens when a caller sends both, and why.
-	// See docs/capabilities/providers.md#a-bounded-call-asks-for-the-shape-of-its-answer.
 	ResponseSchema *ResponseSchema
 	// Flow is the bounded call this request is, set by the code that builds
 	// it and never by a wrapper, so a profile's declaration scoped to that
 	// flow narrows this request and no other. Empty is the main agent and
 	// its children, where nothing may be scoped.
-	// See docs/capabilities/providers.md#a-bounded-call-asks-for-the-shape-of-its-answer.
 	Flow Flow
 }
 
@@ -410,7 +398,6 @@ type ResponseSchema struct {
 // string describes nothing they can carry — so a converter handed one would
 // send a format with no shape under it while having already dropped the
 // tools, which is the one combination that is worse than either path.
-// See docs/capabilities/providers.md#a-bounded-call-asks-for-the-shape-of-its-answer.
 func (o CompletionOpts) SchemaFor(model string) *ResponseSchema {
 	s := o.ResponseSchema
 	if s == nil || !isJSONObject(s.Schema) {
@@ -434,7 +421,6 @@ func isJSONObject(raw json.RawMessage) bool {
 // deliberately not among them: the newest models refuse a forced choice
 // outright, so a caller built on one is built on something being withdrawn.
 // A caller that wants a particular tool asks for it in the prompt.
-// See docs/capabilities/providers.md#a-request-says-whether-a-tool-may-be-called.
 const (
 	// ToolChoiceAuto lets the model call a tool or answer in text.
 	ToolChoiceAuto = "auto"

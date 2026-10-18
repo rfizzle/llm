@@ -8,14 +8,12 @@ package llm
 // a named effort under adaptive thinking on the current Anthropic models, a
 // token budget on the older ones and on Gemini. The session should not have
 // to know which: it picks one level and each provider translates, after
-// fitting the level to what the model in front of it accepts
-// (docs/capabilities/providers.md#a-level-is-fitted-to-the-model-before-it-is-sent).
+// fitting the level to what the model in front of it accepts.
 //
 // Off means the field is not sent at all. That matters more than it sounds:
 // `reasoning_effort` on a model that has no reasoning (gpt-4o, gpt-4.1) is a
 // 400, so "no opinion" has to stay distinguishable from "the lowest opinion".
-// It is no longer the default — a session that says nothing starts on medium
-// (docs/capabilities/providers.md#a-session-never-starts-without-thinking) —
+// It is no longer the default — a session that says nothing starts on medium —
 // but it is still a level a session can choose.
 
 import (
@@ -254,7 +252,6 @@ type ReasoningBlock struct {
 // Moving it costs the prefix cache from that position on, which is why it is
 // the user turn and not the round: within a turn it does not move, and a
 // turn is where the rounds are.
-// See docs/capabilities/providers.md#only-the-chain-being-worked-on-now-goes-back.
 func replayFrom(messages []Message) int {
 	lastUser, lastAssistant := -1, -1
 	for i, m := range messages {

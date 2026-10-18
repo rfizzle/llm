@@ -1,7 +1,6 @@
 package llm
 
-// What a broken stream keeps (
-// docs/interface/surfaces.md#the-recovery-row).
+// What a broken stream keeps.
 //
 // Every dialect used to drop what it had accumulated the moment the transport
 // failed. The text was already on screen, so it survived by accident, but the

@@ -248,7 +248,6 @@ type gatewayUsage struct {
 // gateway's cache writes were billed as fresh input, which understated every
 // round on it by the write premium: twice the input rate on the hour's
 // lease, and every round of a growing conversation writes something.
-// See docs/capabilities/providers.md#the-session-says-whether-the-cache-worked.
 func openAIChatUsage(u *openai.Usage, raw []byte) *Usage {
 	usage := &Usage{
 		PromptTokens:     u.PromptTokens,

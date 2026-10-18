@@ -187,7 +187,6 @@ func chatModels(names []string) []string {
 // the endpoint refuses or truncates, visibly. So each row is the conservative
 // end of its generation's published window, and which generations get a row
 // depends on what an unrecognised name in the family means — see below.
-// See docs/capabilities/providers.md#model-data-is-fetched-and-a-snapshot-ships.
 var knownContextWindows = []struct {
 	prefix string
 	window int64

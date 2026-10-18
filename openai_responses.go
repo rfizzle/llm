@@ -499,7 +499,6 @@ func toResponseItems(messages []Message, replayReasoning bool) ([]responseItem, 
 			// guidance is the reasoning items since the last user message
 			// and no more, and outside its newest models an earlier turn's
 			// is not rendered into the sample at all (reasoning.go).
-			// See docs/capabilities/providers.md#thinking-goes-back-to-the-model-that-did-it.
 			if replayReasoning && i >= replay {
 				for _, r := range m.Reasoning {
 					// Both halves or nothing. A block missing either is one
@@ -586,7 +585,6 @@ func responsesAttachmentContent(atts []Attachment) []responseContent {
 // enumeration, so a third value is a 400 on the whole request rather than a
 // part the model quietly skips, and a turn lost to a voice memo is worse than
 // a voice memo the model is told about in words.
-// See docs/capabilities/chat.md#what-can-ride-with-a-message.
 func openAIAudioFormat(mediaType string) (string, bool) {
 	switch mediaType {
 	case "audio/mpeg":
@@ -653,7 +651,6 @@ func init() {
 	// already keys on and what only the person's own switch changes: moving
 	// billing between the plan and a key is a provider switch, never a
 	// fallback taken on their behalf.
-	// See docs/capabilities/chatgpt-plan.md#what-a-plan-session-cannot-do.
 	registerBuiltin(chatGPTName, func(opts ResolveOpts) (Provider, error) {
 		return NewChatGPT(opts)
 	})

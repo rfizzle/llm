@@ -40,7 +40,6 @@ const (
 	// dialects take one at all, and each of those takes a shorter list of
 	// formats than it takes of pictures, so the converters decide format by
 	// format and anything a dialect has no part for degrades to the note.
-	// See docs/capabilities/chat.md#what-can-ride-with-a-message.
 	AttachmentAudio AttachmentKind = "audio"
 	// AttachmentText is text that belongs in the prompt rather than in the
 	// sentence: a file's contents, wrapped so the model can tell the two
@@ -62,7 +61,6 @@ type Attachment struct {
 	// the two verbs that take one. Empty on a message saved before handles
 	// existed. Label is where a converter reads it: every part a user
 	// message carries is led by a line naming it by its handle.
-	// See docs/capabilities/chat.md#what-can-ride-with-a-message.
 	Handle    string
 	MediaType string
 	Data      []byte
@@ -97,8 +95,7 @@ func (a Attachment) AsText() string {
 // the sentence resolve — "Image#1 shows the error" names the part the line
 // stands over — and it carries the name as well, so a file named in the
 // sentence by hand resolves too. The bytes still lead the message and the
-// sentence still follows them: the label points, it moves nothing
-// (docs/capabilities/chat.md#what-can-ride-with-a-message).
+// sentence still follows them: the label points, it moves nothing.
 //
 // An attachment saved before handles existed is labelled by its name alone.
 func (a Attachment) Label() string {

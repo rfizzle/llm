@@ -11,7 +11,6 @@ package llm
 // models offer it is declared, never inferred: the native OpenAI providers
 // answer from a floor of their own below, a gateway profile from a model it
 // declares, and a model nothing names does not offer it.
-// See docs/capabilities/providers.md#a-bounded-call-asks-for-the-shape-of-its-answer.
 
 import (
 	"bytes"

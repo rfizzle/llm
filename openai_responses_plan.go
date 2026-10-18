@@ -7,7 +7,6 @@ package llm
 // route rejects are never sent, tools travel grouped, and the errors are a
 // family of their own (failure.go). OpenAI never moves a refused request to
 // another billing path, and neither does this route.
-// See docs/capabilities/chatgpt-plan.md#what-a-plan-session-cannot-do.
 
 import (
 	"context"

@@ -2,8 +2,7 @@
 // it has, and how it spells its thinking level. One public table carries all
 // three, so one download serves the spend meter, the context gauge, and the
 // reasoning ladder — and one snapshot of it ships inside the binary as the
-// floor under the download
-// (docs/capabilities/providers.md#model-data-is-fetched-and-a-snapshot-ships).
+// floor under the download.
 package pricing
 
 import (
@@ -296,7 +295,7 @@ func (t *Table) Cost(model string, tokensIn, tokensOut int64) (inputCost, output
 //
 // A caller that has no cache figures fills in Input and Output and gets
 // exactly what Cost has always answered.
-// See docs/capabilities/providers.md#the-prompt-prefix-is-paid-for-once.
+// See the README's "Price a Usage" section.
 type Tokens struct {
 	Input   int64
 	Cached  int64

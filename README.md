@@ -128,9 +128,9 @@ if _, err := acct.Login(ctx, chatgpt.LoginOptions{Say: os.Stdout}); err != nil {
 p, err := llm.Resolve("chatgpt", llm.ResolveOpts{TokenSource: acct})
 ```
 
-`Login` opens a browser and waits on a loopback callback, so `Example_signIn`
-in `chatgpt/example_test.go` is compiled and not run. `Example_signedOut` runs
-the other half: an account with no record answers `llm.ErrChatGPTSignedOut`,
+`Login` opens a browser and waits on a loopback callback. `Example_signIn` in
+`chatgpt/example_test.go` runs it against an in-memory authorization server, so
+it needs no browser or network. `Example_signedOut` runs the other half: an account with no record answers `llm.ErrChatGPTSignedOut`,
 whose text names the app's `SignInHint`. Match these errors with `errors.Is`,
 never by their text.
 

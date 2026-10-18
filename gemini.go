@@ -572,7 +572,6 @@ func geminiAttachmentParts(atts []Attachment) []*genai.Part {
 // `audio/mpeg`. Translating in the converter rather than at the sniffer keeps
 // the name a reader is shown the name the format actually has, and keeps one
 // vendor's spelling out of the type every other vendor is handed.
-// See docs/capabilities/chat.md#what-can-ride-with-a-message.
 func geminiAudioMIME(mediaType string) (string, bool) {
 	switch mediaType {
 	case "audio/mpeg":

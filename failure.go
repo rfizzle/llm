@@ -1,7 +1,6 @@
 package llm
 
-// The provider failure taxonomy (
-// docs/interface/surfaces.md#the-recovery-row).
+// The provider failure taxonomy.
 //
 // Every dialect used to map its own 401 and its own 429 and hand everything
 // else to the transcript as a Go error string, so one failure read four
@@ -288,7 +287,6 @@ func (c classifier) classify(err error) error {
 // commonest line is something the reader did on purpose is one they stop
 // reading. Everything else is a request that failed, which is what somebody
 // tailing this file came for.
-// See docs/capabilities/configuration.md#a-failure-is-written-down.
 func record(f *Failure) {
 	if f.Class == ClassCancelled {
 		return
@@ -395,7 +393,6 @@ func classFromStatus(status int, message string) (Class, bool) {
 // The same codes arrive mid-stream with no status at all, which is the other
 // reason they are read here rather than through the status. The list is the
 // docs' structured-errors table and nothing more.
-// See docs/capabilities/chatgpt-plan.md#what-a-plan-session-cannot-do.
 func classFromCode(code string) (Class, bool) {
 	switch code {
 	case "subscription_sharing_usage_limit_exceeded":

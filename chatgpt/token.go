@@ -44,7 +44,7 @@ const defaultTokenLife = time.Hour
 // the file lock, and the record is read again once both are held, so the
 // process that waited finds the token the first one fetched instead of
 // spending the refresh token a second time.
-// See docs/capabilities/chatgpt-plan.md#one-refresh-at-a-time.
+// See the README's "Sign in with a ChatGPT plan" section.
 func (a *Account) Token(ctx context.Context, refused string) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
