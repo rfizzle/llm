@@ -19,7 +19,7 @@ PROJECT_GOFILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*" -not
 TRACKED_GOFILES=$(shell git ls-files '*.go')
 PROJECT_PACKAGES=$(shell go list ./...)
 
-.PHONY: all fmt fmt-check vet lint test integration help
+.PHONY: all fmt fmt-check vet lint test integration model-data help
 
 all: help
 
@@ -55,6 +55,11 @@ test: ## Run the hermetic tier: no listener, clipboard, daemon or network
 
 integration: ## Run the tests behind the integration tag (may need the network or credentials)
 	@$(HERMETIC_ENV) $(GOTEST) -mod=readonly -tags=integration -count=1 -v $(PROJECT_PACKAGES)
+
+## Data:
+model-data: ## Regenerate the built-in model-data snapshot from the public table
+	@echo "Regenerating pricing/models.json..."
+	@python3 scripts/model-data.py > pricing/models.json
 
 ## Help:
 help: ## Show this help
