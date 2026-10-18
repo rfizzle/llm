@@ -1,0 +1,42 @@
+# The linter gate behind `make lint`, set the way shhh's is: the default set —
+# errcheck, govet, ineffassign, staticcheck, unused — with one carve-out for
+# the returns the tree leaves unchecked where nothing could be done with them
+# (`defer x.Close()`, `fmt.Fprint*` to a buffer, `fmt.Sscanf` on a value whose
+# zero is the answer for an unparsable one). Anything outside that list is
+# still checked.
+#
+# errorlint on top of that: an error is compared with errors.Is, taken apart
+# with errors.As and wrapped with %w.
+#
+# Two size gates. gocognit at 50 fails a function a reader can no longer hold
+# in their head; nestif at 10 fails an `if` whose nested branches score 10 or
+# more. Tests are out of both: the gate is for product code.
+#
+# shhh carries a list of per-function exclusions for code that predates the
+# size gates. This module has none: code that moves in is held to the lines.
+version: "2"
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - gocognit
+    - nestif
+  settings:
+    gocognit:
+      min-complexity: 50
+    nestif:
+      min-complexity: 10
+  exclusions:
+    rules:
+      - linters: [errcheck]
+        text: 'Error return value of `((.*\.)?(Close|Rollback|Flush)|fmt\.Fprint(f|ln)?|fmt\.Sscanf)` is not checked'
+      # Tests read top to bottom; the size gates are for product code.
+      - linters: [gocognit, nestif]
+        path: _test\.go$
+issues:
+  # Every finding, every time: a cap on identical messages hides the rest of a
+  # class behind three examples, and a second finding on a line is not folded
+  # into the first.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false

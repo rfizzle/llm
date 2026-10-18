@@ -1,0 +1,10 @@
+.idea
+.cache
+.claude
+
+# Binary
+/bin
+
+# A local workspace file joins this module to an app while a change spans both.
+go.work
+go.work.sum
