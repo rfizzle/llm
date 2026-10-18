@@ -190,3 +190,16 @@ func TestCallbackPages_NameTheApp(t *testing.T) {
 		}
 	}
 }
+
+// The registration refusal names the app it was for, and the sentinel still
+// matches it.
+func TestRegistrationIncomplete_NamesTheApp(t *testing.T) {
+	err := error(registrationIncomplete{testApp.Name})
+	want := "the ChatGPT sign-in came back without registering acme on this host; run the sign-in again"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+	if !errors.Is(err, errRegistrationIncomplete) {
+		t.Errorf("%v does not match the sentinel", err)
+	}
+}

@@ -59,10 +59,24 @@ type Result struct {
 // Refusals a finished callback can still end in. Nothing is written for any
 // of them.
 var (
-	errRegistrationIncomplete = errors.New("the ChatGPT sign-in came back without registering the app on this host; run the sign-in again")
-	errClientMismatch         = errors.New("the ChatGPT sign-in came back for a different registration than this host's; nothing was saved")
-	errCodeRefused            = errors.New("the ChatGPT sign-in code was refused; run the sign-in again")
+	errRegistrationIncomplete error = registrationIncomplete{}
+	errClientMismatch               = errors.New("the ChatGPT sign-in came back for a different registration than this host's; nothing was saved")
+	errCodeRefused                  = errors.New("the ChatGPT sign-in code was refused; run the sign-in again")
 )
+
+// registrationIncomplete is errRegistrationIncomplete, carrying the app's
+// name so the sentence says whom the host was not registered for. The bare
+// value is the sentinel errors.Is matches against.
+type registrationIncomplete struct{ app string }
+
+func (e registrationIncomplete) Error() string {
+	return "the ChatGPT sign-in came back without registering " + e.app + " on this host; run the sign-in again"
+}
+
+func (registrationIncomplete) Is(target error) bool {
+	_, ok := target.(registrationIncomplete)
+	return ok
+}
 
 // attempt is one sign-in's single-use values. state ties the callback to
 // this attempt, nonce ties the ID token to it, and the verifier proves to
@@ -255,7 +269,7 @@ func (a *Account) finish(ctx context.Context, at attempt, cb callback, saved Cre
 	clientID := at.clientID
 	switch {
 	case !at.returning && cb.clientID == "":
-		return Result{}, errRegistrationIncomplete
+		return Result{}, registrationIncomplete{a.app.Name}
 	case !at.returning:
 		clientID = cb.clientID
 	case cb.clientID != "" && cb.clientID != at.clientID:
