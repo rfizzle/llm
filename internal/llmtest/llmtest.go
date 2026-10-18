@@ -312,25 +312,14 @@ var (
 // disagree about: an MP3 both OpenAI dialects name, a WAV they name under a
 // media type the sniffing rules do not use, and an Ogg only Gemini takes.
 var (
-	MP3 = llm.Attachment{
-		Kind:      llm.AttachmentAudio,
-		Name:      "memo.mp3",
-		MediaType: "audio/mpeg",
-		Data:      []byte("ID3\x04"),
-	}
-	WAV = llm.Attachment{
-		Kind:      llm.AttachmentAudio,
-		Name:      "clip.wav",
-		MediaType: "audio/wav",
-		Data:      []byte("RIFF\x00\x00\x00\x00WAVE"),
-	}
-	OGG = llm.Attachment{
-		Kind:      llm.AttachmentAudio,
-		Name:      "call.ogg",
-		MediaType: "audio/ogg",
-		Data:      []byte("OggS\x00"),
-	}
+	MP3 = recording("memo.mp3", "audio/mpeg", "ID3\x04")
+	WAV = recording("clip.wav", "audio/wav", "RIFF\x00\x00\x00\x00WAVE")
+	OGG = recording("call.ogg", "audio/ogg", "OggS\x00")
 )
+
+func recording(name, mediaType, data string) llm.Attachment {
+	return llm.Attachment{Kind: llm.AttachmentAudio, Name: name, MediaType: mediaType, Data: []byte(data)}
+}
 
 // BodyMarks is the lifetime of every marker in a chat-completions body, keyed
 // by the index of the message carrying it.
