@@ -1,4 +1,4 @@
-// Package pricing is shhh's model data: what a model costs, how much context
+// Package pricing is the model data: what a model costs, how much context
 // it has, and how it spells its thinking level. One public table carries all
 // three, so one download serves the spend meter, the context gauge, and the
 // reasoning ladder — and one snapshot of it ships inside the binary as the
@@ -32,8 +32,8 @@ const (
 	failFile = "model_prices.fail"
 	// failTTL is how long that failure is remembered: short enough that a
 	// transient outage costs an hour of staleness rather than a day, on a
-	// table that is only refreshed daily anyway. internal/update uses the
-	// same window on the release feed for the same reason.
+	// table that is only refreshed daily anyway. the app's release check can use the
+	// same window on its feed for the same reason.
 	failTTL = time.Hour
 )
 
@@ -396,7 +396,7 @@ func markFailure(path string) {
 // download fetches the table over the cache at path, and records either
 // outcome: a failure leaves the cache untouched and writes the marker, a
 // success clears it. Both Load's background refresh and Refresh go through
-// here, so a manual `shhh update` that fails is remembered too.
+// here, so a manual update by the app that fails is remembered too.
 func download(path string) error {
 	if err := fetch(path); err != nil {
 		markFailure(path)
@@ -483,23 +483,35 @@ func cachePath() (string, error) {
 	return filepath.Join(dir, cacheFile), nil
 }
 
-// CacheDir is where the price table is cached. It is exported so the
-// migration that moves a Mac off ~/Library can name the same directory this
-// package writes to, rather than deriving the rule a second time.
+// CacheDir is where the price table is cached. It is exported so an app can
+// keep its other cached files beside it rather than deriving the rule a
+// second time.
 func CacheDir() (string, error) { return cacheDir() }
 
-// cacheDir is one layout on every platform: XDG_CACHE_HOME if it is set, then
-// ~/.cache/shhh — the same rule the config and data directories follow
-// (docs/capabilities/configuration.md#one-layout-everywhere). This one holds
-// only the price table, which is re-downloaded when it is missing, so a Mac
-// that still has the old ~/Library/Caches/shhh loses nothing by ignoring it.
-func cacheDir() (string, error) {
-	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
-		return filepath.Join(xdg, "shhh"), nil
+// cacheDirFunc is the app's answer for where the table is cached, or nil
+// before it has given one.
+var cacheDirFunc atomic.Pointer[func() (string, error)]
+
+// SetCacheDir names where the app caches the price table. The app hands it a
+// function once at startup rather than a path, so an app whose answer follows
+// the environment keeps following it. Without one the table is cached under
+// the operating system's user cache directory, in a directory named llm.
+func SetCacheDir(dir func() (string, error)) {
+	if dir == nil {
+		cacheDirFunc.Store(nil)
+		return
 	}
-	home, err := os.UserHomeDir()
+	cacheDirFunc.Store(&dir)
+}
+
+// cacheDir is the app's directory if it set one, else <user cache dir>/llm.
+func cacheDir() (string, error) {
+	if f := cacheDirFunc.Load(); f != nil {
+		return (*f)()
+	}
+	base, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".cache", "shhh"), nil
+	return filepath.Join(base, "llm"), nil
 }

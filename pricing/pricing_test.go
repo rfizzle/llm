@@ -338,7 +338,7 @@ func body(data string) (*http.Response, error) {
 // a download fails, so every process in an unattended run pays the same
 // timeout over again.
 func TestLoad_AFailedDownloadIsNotRepeatedByTheNextProcess(t *testing.T) {
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	useCacheDir(t)
 	calls := stubTransport(t, func() (*http.Response, error) {
 		return nil, errors.New("no network")
 	})
@@ -357,7 +357,7 @@ func TestLoad_AFailedDownloadIsNotRepeatedByTheNextProcess(t *testing.T) {
 }
 
 func TestShouldRefresh_TheFailureMarkerExpires(t *testing.T) {
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	useCacheDir(t)
 	path, err := cachePath()
 	must(t, err)
 
@@ -374,7 +374,7 @@ func TestShouldRefresh_TheFailureMarkerExpires(t *testing.T) {
 }
 
 func TestDownload_AFailureKeepsAGoodCacheAndASuccessClearsTheMarker(t *testing.T) {
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	useCacheDir(t)
 	path, err := cachePath()
 	must(t, err)
 	must(t, os.MkdirAll(filepath.Dir(path), 0o700))
@@ -416,7 +416,7 @@ func TestDownload_AFailureKeepsAGoodCacheAndASuccessClearsTheMarker(t *testing.T
 // The startup cost this all exists to remove: Load reads disk and returns,
 // however long the download takes.
 func TestLoad_DoesNotWaitForTheDownload(t *testing.T) {
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	useCacheDir(t)
 	release := make(chan struct{})
 	stubTransport(t, func() (*http.Response, error) {
 		<-release
@@ -439,4 +439,13 @@ func TestLoad_DoesNotWaitForTheDownload(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Load waited for the download")
 	}
+}
+
+// useCacheDir points the cache at a directory this test owns and puts the
+// default back afterwards.
+func useCacheDir(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	SetCacheDir(func() (string, error) { return dir, nil })
+	t.Cleanup(func() { SetCacheDir(nil) })
 }
