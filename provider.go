@@ -299,7 +299,7 @@ func (s StopReason) String() string {
 	return string(s)
 }
 
-// stopForCalls names the ending two of the four dialects have no word for.
+// StopForCalls names the ending two of the four dialects have no word for.
 // They finish a round of tool calls on the same status they finish an answer
 // on — "stop", "completed" — so the calls are the only thing that says the
 // round is owed results, and a reader of the closed set would otherwise see
@@ -308,7 +308,7 @@ func (s StopReason) String() string {
 // It never overrides a reason the dialect did name. A round cut at the
 // ceiling stays `length` however many calls survived it, because what a
 // caller does about that is the thing this whole set exists to tell it.
-func stopForCalls(stop StopReason, calls []ToolCall) StopReason {
+func StopForCalls(stop StopReason, calls []ToolCall) StopReason {
 	if stop == StopEnd && len(calls) > 0 {
 		return StopTool
 	}

@@ -53,10 +53,10 @@ func caller() App {
 	return neutralApp
 }
 
-// apiKeyVar and baseURLVar are the caller's own variables, read before the
-// vendor's.
-func apiKeyVar() string  { return caller().EnvPrefix + "_API_KEY" }
-func baseURLVar() string { return caller().EnvPrefix + "_BASE_URL" }
+// APIKeyVar and BaseURLVar are the app's own variables, which a backend
+// reads before the vendor's.
+func (a App) APIKeyVar() string  { return a.EnvPrefix + "_API_KEY" }
+func (a App) BaseURLVar() string { return a.EnvPrefix + "_BASE_URL" }
 
-// keyVars is how an error names the variables a key may come from.
-func keyVars(vendor string) string { return apiKeyVar() + " or " + vendor }
+// KeyVars is how an error names the variables a key may come from.
+func (a App) KeyVars(vendor string) string { return a.APIKeyVar() + " or " + vendor }

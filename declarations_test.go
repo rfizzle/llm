@@ -1,11 +1,7 @@
 package llm
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
-	"io"
-	"net/http"
 	"reflect"
 	"testing"
 )
@@ -135,106 +131,5 @@ func TestDeclarations_TheRegistry(t *testing.T) {
 	}
 	if _, ok := ParseFlow("extraction"); ok {
 		t.Error("a word outside the set parsed")
-	}
-}
-
-// On one model, the classifier's flow is sent its tool and no format, and
-// the backlog's is sent the format and no tools.
-func TestAnthropic_ScopedNoSchemaSendsTheToolForThatFlowOnly(t *testing.T) {
-	declare(t, "gw", map[string]Declared{"claude-sonnet-5-5": scopedNoSchema(FlowClassifier)})
-
-	var body map[string]any
-	srv := providerTestHTTP.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		body = nil
-		_ = json.Unmarshal(raw, &body)
-		w.Header().Set("Content-Type", "text/event-stream")
-		sseEvent(w, "message_start", `{"type":"message_start","message":{"id":"m","type":"message","role":"assistant","content":[],"model":"claude-sonnet-5-5","usage":{"input_tokens":1,"output_tokens":1}}}`)
-		sseEvent(w, "message_stop", `{"type":"message_stop"}`)
-	}))
-	defer srv.Close()
-	p := newTestAnthropic(ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL})
-
-	send := func(flow Flow) {
-		t.Helper()
-		events, err := p.StreamCompletion(context.Background(), []Message{{Role: RoleUser, Content: "hi"}}, CompletionOpts{
-			Model:          "claude-sonnet-5-5",
-			Flow:           flow,
-			Effort:         EffortLow,
-			Tools:          []Tool{{Name: "answer", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}},
-			ToolChoice:     ToolChoiceAuto,
-			ResponseSchema: &ResponseSchema{Name: "answer", Schema: json.RawMessage(`{"type":"object","additionalProperties":false}`)},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, _, _, _ = drainAnthropic(t, events)
-	}
-
-	send(FlowClassifier)
-	config, _ := body["output_config"].(map[string]any)
-	if _, ok := config["format"]; ok {
-		t.Errorf("classifier: no format may be sent, got %v", config["format"])
-	}
-	if tools, _ := body["tools"].([]any); len(tools) != 1 {
-		t.Errorf("classifier: the tool must be offered, got %v", body["tools"])
-	}
-	if choice, _ := body["tool_choice"].(map[string]any); choice["type"] != "auto" {
-		t.Errorf("classifier: tool_choice should be auto, got %v", body["tool_choice"])
-	}
-
-	send(FlowBacklog)
-	config, _ = body["output_config"].(map[string]any)
-	if format, _ := config["format"].(map[string]any); format["type"] != "json_schema" {
-		t.Errorf("backlog: the format must be sent, got %v", body["output_config"])
-	}
-	if _, ok := body["tools"]; ok {
-		t.Error("backlog: a request carrying a schema must not also offer tools")
-	}
-}
-
-// prompt_cache = false says the endpoint keeps no cache, and changes nothing
-// that goes out: the marks are still sent, on both the Messages API and a
-// gateway route, and the request is byte for byte what it was.
-func TestDeclarations_PromptCacheOffChangesNoRequest(t *testing.T) {
-	const model = "claude-sonnet-5-5"
-	var body []byte
-	srv := providerTestHTTP.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ = io.ReadAll(r.Body)
-		w.Header().Set("Content-Type", "text/event-stream")
-		sseEvent(w, "message_start", `{"type":"message_start","message":{"id":"m","type":"message","role":"assistant","content":[],"model":"claude-sonnet-5-5","usage":{"input_tokens":1,"output_tokens":1}}}`)
-		sseEvent(w, "message_stop", `{"type":"message_stop"}`)
-	}))
-	defer srv.Close()
-	p := newTestAnthropic(ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL})
-	send := func() []byte {
-		t.Helper()
-		events, err := p.StreamCompletion(context.Background(), []Message{
-			{Role: RoleSystem, Content: "sys"},
-			{Role: RoleUser, Content: "hi"},
-		}, CompletionOpts{Model: model})
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, _, _, _ = drainAnthropic(t, events)
-		return body
-	}
-	before := send()
-	declare(t, "gw", map[string]Declared{model: {Model: map[string]any{KeyPromptCache: false}}})
-	if !CapabilitiesFor(model).NoPromptCache {
-		t.Fatal("the declaration did not narrow the model")
-	}
-	after := send()
-	if !bytes.Equal(before, after) {
-		t.Errorf("the request changed:\n%s\n%s", before, after)
-	}
-	if !bytes.Contains(after, []byte(`"cache_control"`)) {
-		t.Errorf("the marks must still be sent: %s", after)
-	}
-
-	gateway := []byte(`{"model":"anthropic/claude-sonnet-5-5","messages":[{"role":"system","content":"sys"},{"role":"user","content":"hi"}]}`)
-	declare(t, "gw", map[string]Declared{"anthropic/claude-sonnet-5-5": {Model: map[string]any{KeyPromptCache: false}}})
-	if marked := markOpenAICacheBody(gateway, CacheTTL1h); !bytes.Contains(marked, []byte(`"cache_control"`)) {
-		t.Errorf("a gateway route keeps its marks: %s", marked)
 	}
 }

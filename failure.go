@@ -17,18 +17,12 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
-	"google.golang.org/genai"
 )
 
 // Class is what went wrong, from a closed vocabulary. The value
@@ -237,11 +231,11 @@ type classifier struct {
 	key    string
 }
 
-// newClassifier returns the func every dialect wraps its errors in. keyEnv is
+// NewClassifier returns the func every dialect wraps its errors in. keyEnv is
 // the variables the key was looked for in, for the auth row's offer; key is
 // the key that was actually sent, of which only the last four characters are
 // ever kept.
-func newClassifier(name, keyEnv, key string) func(error) error {
+func NewClassifier(name, keyEnv, key string) func(error) error {
 	c := classifier{name: name, keyEnv: keyEnv, key: key}
 	return c.classify
 }
@@ -265,7 +259,7 @@ func (c classifier) classify(err error) error {
 		KeyTail:  keyTail(c.key),
 		err:      err,
 	}
-	var coded *apiError
+	var coded *APIError
 	if errors.As(err, &coded) {
 		f.Code, f.Param, f.RequestID = coded.Code, coded.Param, coded.RequestID
 	}
@@ -302,7 +296,7 @@ func record(f *Failure) {
 
 // classOf is the mapping itself, and the only place it lives. A stream that
 // went quiet comes first, ahead of the cancellation the deadline is enforced
-// with (idle.go); cancellation comes next because a cancelled request often
+// with (internal/idle); cancellation comes next because a cancelled request often
 // surfaces as a transport error that would otherwise read as a network
 // failure; a code the endpoint named is asked before the status, because the
 // plan route's codes split one status into answers that need different
@@ -331,7 +325,7 @@ func classOf(err error, status int, code, message string) Class {
 	if class, ok := classFromMessage(message); ok {
 		return class
 	}
-	if isNetworkError(err) {
+	if IsNetworkError(err) {
 		return ClassNetwork
 	}
 	return ClassUnclassified
@@ -558,43 +552,46 @@ func retryAfter(message string) time.Duration {
 	return time.Duration(value * float64(unit))
 }
 
-// errorShape pulls the status and the provider's own message out of the typed
-// errors each SDK returns. It never calls the SDK error's own Error method:
-// the Anthropic one dereferences the request it was built from, which a
-// synthetic error in a test does not have.
+// ErrorShape reads the status and the provider's own message out of the typed
+// error one SDK returns, and says whether err was one. A backend registers its
+// SDK's reader with RegisterErrorShape, so this package links no SDK: the app
+// pays for the vendors it imported and no others. A reader never calls the
+// SDK error's own Error method: the Anthropic one dereferences the request it
+// was built from, which a synthetic error in a test does not have.
+type ErrorShape func(err error) (status int, message string, ok bool)
+
+// errorShapes are the readers the imported backends registered. Each knows
+// one SDK's concrete error types and no two share one, so the order they
+// registered in cannot change an answer.
+var errorShapes []ErrorShape
+
+// RegisterErrorShape adds the reader for one SDK's errors. A backend calls it
+// from its init, beside RegisterBuiltin.
+func RegisterErrorShape(shape ErrorShape) {
+	errorShapes = append(errorShapes, shape)
+}
+
+// errorShape pulls the status and the provider's own message out of an error:
+// the refusal a dialect read off the wire itself, then whatever an imported
+// backend's SDK returned, then the error's own words.
 func errorShape(err error) (int, string) {
-	var coded *apiError
+	var coded *APIError
 	if errors.As(err, &coded) {
 		return coded.Status, coded.Message
 	}
-	var apiErr *openai.APIError
-	if errors.As(err, &apiErr) {
-		return apiErr.HTTPStatusCode, apiErr.Message
-	}
-	var reqErr *openai.RequestError
-	if errors.As(err, &reqErr) {
-		message := strings.TrimSpace(string(reqErr.Body))
-		if message == "" && reqErr.Err != nil {
-			message = reqErr.Err.Error()
+	for _, shape := range errorShapes {
+		if status, message, ok := shape(err); ok {
+			return status, message
 		}
-		return reqErr.HTTPStatusCode, message
-	}
-	var anthErr *anthropic.Error
-	if errors.As(err, &anthErr) {
-		return anthErr.StatusCode, anthropicMessage(anthErr)
-	}
-	var genErr genai.APIError
-	if errors.As(err, &genErr) {
-		return genErr.Code, genErr.Message
 	}
 	return 0, err.Error()
 }
 
-// apiError is a refusal as the endpoint wrote it, for the dialect that reads
+// APIError is a refusal as the endpoint wrote it, for the dialect that reads
 // the wire itself rather than through an SDK's error type: the status (zero
 // for a failure that arrived on an open stream), the message, and the code,
 // param and request id the classifier keeps on the Failure.
-type apiError struct {
+type APIError struct {
 	Status    int
 	Message   string
 	Code      string
@@ -603,33 +600,12 @@ type apiError struct {
 }
 
 // Error is the endpoint's own message; the classified Failure says the rest.
-func (e *apiError) Error() string { return e.Message }
+func (e *APIError) Error() string { return e.Message }
 
-// anthropicMessage reads the message out of the Messages API's error
-// envelope, falling back to the error type it names — `overloaded_error` is a
-// worse sentence than the message but a better one than nothing.
-func anthropicMessage(err *anthropic.Error) string {
-	var envelope struct {
-		Error struct {
-			Type    string `json:"type"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if raw := err.RawJSON(); raw != "" {
-		if json.Unmarshal([]byte(raw), &envelope) == nil && envelope.Error.Message != "" {
-			return envelope.Error.Message
-		}
-	}
-	if t := string(err.Type()); t != "" {
-		return t
-	}
-	return fmt.Sprintf("HTTP %d", err.StatusCode)
-}
-
-// isNetworkError is the last question asked of an error that named nothing:
+// IsNetworkError is the last question asked of an error that named nothing:
 // did it ever reach the provider. net.Error covers the timeouts and the
 // dials; the phrase table above covers what the SDKs wrap them in.
-func isNetworkError(err error) bool {
+func IsNetworkError(err error) bool {
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		return true
@@ -646,6 +622,16 @@ func hasAny(message string, phrases []string) bool {
 		}
 	}
 	return false
+}
+
+// Record files a failure a backend named itself, the way classify files every
+// other: err is what it wraps, the message is bounded, and the refusal is
+// written to the diagnostic log once.
+func (f *Failure) Record(err error) *Failure {
+	f.err = err
+	f.Message = bound(f.Message)
+	record(f)
+	return f
 }
 
 // keyTail is the last four characters of the key that was sent — enough to

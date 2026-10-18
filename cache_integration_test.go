@@ -1,17 +1,22 @@
 //go:build integration
 
-package llm
+package llm_test
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/anthropic"
+	"github.com/rfizzle/llm/openrouter"
 )
 
-// TestPromptCacheIntegration checks that the markers cache.go places are
+// TestPromptCacheIntegration checks that the markers the anthropic package places are
 // honoured by a real Messages API endpoint: the first request writes the
 // prefix and the second reads it back.
 //
@@ -38,10 +43,10 @@ func TestPromptCacheIntegration(t *testing.T) {
 	}
 	model := os.Getenv("ACME_CACHE_IT_MODEL")
 	if model == "" {
-		model = defaultAnthropicModel
+		model = llm.Defaults("anthropic").Model
 	}
 
-	p, err := NewAnthropic(ResolveOpts{APIKey: key, BaseURL: base, Model: model})
+	p, err := anthropic.New(llm.ResolveOpts{APIKey: key, BaseURL: base, Model: model})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,13 +55,13 @@ func TestPromptCacheIntegration(t *testing.T) {
 		"Background: the operator maintains a command-line coding agent with a passive "+
 			"loop, a provider registry, a permission classifier and a golden-file suite. ", 800)
 
-	ask := func(msgs []Message) *Usage {
+	ask := func(msgs []llm.Message) *llm.Usage {
 		t.Helper()
-		ch, err := p.StreamCompletion(context.Background(), msgs, CompletionOpts{Model: model, MaxTokens: 32})
+		ch, err := p.StreamCompletion(context.Background(), msgs, llm.CompletionOpts{Model: model, MaxTokens: 32})
 		if err != nil {
 			t.Fatal(err)
 		}
-		var usage *Usage
+		var usage *llm.Usage
 		for ev := range ch {
 			if ev.Err != nil {
 				t.Fatal(ev.Err)
@@ -71,9 +76,9 @@ func TestPromptCacheIntegration(t *testing.T) {
 		return usage
 	}
 
-	first := []Message{
-		{Role: RoleSystem, Content: system},
-		{Role: RoleUser, Content: "Say one."},
+	first := []llm.Message{
+		{Role: llm.RoleSystem, Content: system},
+		{Role: llm.RoleUser, Content: "Say one."},
 	}
 	u1 := ask(first)
 	t.Logf("first:  prompt=%d fresh=%d written=%d read=%d",
@@ -82,9 +87,9 @@ func TestPromptCacheIntegration(t *testing.T) {
 
 	// The same prefix with two more messages on the end, which is the shape
 	// every round after the first has.
-	second := append(append([]Message{}, first...),
-		Message{Role: RoleAssistant, Content: "One."},
-		Message{Role: RoleUser, Content: "Say two."},
+	second := append(append([]llm.Message{}, first...),
+		llm.Message{Role: llm.RoleAssistant, Content: "One."},
+		llm.Message{Role: llm.RoleUser, Content: "Say two."},
 	)
 	u2 := ask(second)
 	t.Logf("second: prompt=%d fresh=%d written=%d read=%d",
@@ -136,9 +141,9 @@ func TestPromptCacheIntegrationOverAConversation(t *testing.T) {
 	if base == "" || key == "" {
 		t.Skip("set ACME_CACHE_IT_URL and ACME_CACHE_IT_KEY to run")
 	}
-	model := first(os.Getenv("ACME_CACHE_IT_MODEL"), defaultAnthropicModel)
+	model := cmp.Or(os.Getenv("ACME_CACHE_IT_MODEL"), llm.Defaults("anthropic").Model)
 
-	p, err := NewAnthropic(ResolveOpts{APIKey: key, BaseURL: base, Model: model})
+	p, err := anthropic.New(llm.ResolveOpts{APIKey: key, BaseURL: base, Model: model})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,12 +169,12 @@ func TestPromptCacheIntegrationThroughAGateway(t *testing.T) {
 	}
 	// The model has to be one the gateway routes to that API — nothing else
 	// is being asked about — so the default is the gateway provider's own.
-	model := first(os.Getenv("ACME_CACHE_IT_GATEWAY_MODEL"), defaultOpenRouterModel)
-	if !anthropicRouted(model) {
+	model := cmp.Or(os.Getenv("ACME_CACHE_IT_GATEWAY_MODEL"), llm.Defaults("openrouter").Model)
+	if !strings.HasPrefix(strings.ToLower(model), "anthropic/") {
 		t.Fatalf("%q is not routed to the Messages API, so there is nothing here to cache", model)
 	}
 
-	p, err := NewOpenRouter(ResolveOpts{APIKey: key, BaseURL: base, Model: model})
+	p, err := openrouter.New(llm.ResolveOpts{APIKey: key, BaseURL: base, Model: model})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +189,7 @@ func TestPromptCacheIntegrationThroughAGateway(t *testing.T) {
 // endpoints see the same conversation and the run costs the same every time.
 // What is being measured is what the request carries, and a fabricated reply
 // carries what a real one does.
-func runCachedConversation(t *testing.T, p Provider, model string) {
+func runCachedConversation(t *testing.T, p llm.Provider, model string) {
 	t.Helper()
 
 	// Far above the minimum cacheable prefix, which differs by model and is
@@ -194,15 +199,15 @@ func runCachedConversation(t *testing.T, p Provider, model string) {
 		"Background: the operator maintains a command-line coding agent with a passive "+
 			"loop, a provider registry, a permission classifier and a golden-file suite. ", 800)
 
-	tools := []Tool{{
+	tools := []llm.Tool{{
 		Name:        "search",
 		Description: "Search the project.",
 		Parameters:  json.RawMessage(`{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}`),
 	}}
 
-	ask := func(msgs []Message) *Usage {
+	ask := func(msgs []llm.Message) *llm.Usage {
 		t.Helper()
-		ch, err := p.StreamCompletion(context.Background(), msgs, CompletionOpts{
+		ch, err := p.StreamCompletion(context.Background(), msgs, llm.CompletionOpts{
 			Model:     model,
 			MaxTokens: 32,
 			Tools:     tools,
@@ -210,7 +215,7 @@ func runCachedConversation(t *testing.T, p Provider, model string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var usage *Usage
+		var usage *llm.Usage
 		for ev := range ch {
 			if ev.Err != nil {
 				t.Fatal(ev.Err)
@@ -225,12 +230,12 @@ func runCachedConversation(t *testing.T, p Provider, model string) {
 		return usage
 	}
 
-	msgs := []Message{{Role: RoleSystem, Content: system}}
+	msgs := []llm.Message{{Role: llm.RoleSystem, Content: system}}
 	reads := make([]int, 0, cacheConversationRounds)
 	for round := 1; round <= cacheConversationRounds; round++ {
 		// Each round's own text, long enough that the prefix it adds is
 		// unambiguously more than the round before it cached.
-		msgs = append(msgs, Message{Role: RoleUser, Content: fmt.Sprintf("Round %d. ", round) + strings.Repeat(
+		msgs = append(msgs, llm.Message{Role: llm.RoleUser, Content: fmt.Sprintf("Round %d. ", round) + strings.Repeat(
 			"Say the next number and nothing else; the notes below are context you already have. ", 20)})
 
 		u := ask(msgs)
@@ -245,18 +250,18 @@ func runCachedConversation(t *testing.T, p Provider, model string) {
 		// The middle round is the parallel batch: one assistant turn asking
 		// for every call at once, and the results answering them.
 		if round == cacheConversationRounds/2 {
-			var calls []ToolCall
-			var results []Message
+			var calls []llm.ToolCall
+			var results []llm.Message
 			for i := 0; i < parallelCacheCalls; i++ {
 				id := fmt.Sprintf("call_%d_%d", round, i)
-				calls = append(calls, ToolCall{ID: id, Name: "search", Arguments: fmt.Sprintf(`{"query":"note %d"}`, i)})
-				results = append(results, Message{Role: RoleTool, ToolCallID: id, Content: strings.Repeat(
+				calls = append(calls, llm.ToolCall{ID: id, Name: "search", Arguments: fmt.Sprintf(`{"query":"note %d"}`, i)})
+				results = append(results, llm.Message{Role: llm.RoleTool, ToolCallID: id, Content: strings.Repeat(
 					fmt.Sprintf("note %d: the registry resolves a provider from flags, config and environment. ", i), 6)})
 			}
-			msgs = append(msgs, Message{Role: RoleAssistant, Content: "Looking.", ToolCalls: calls})
+			msgs = append(msgs, llm.Message{Role: llm.RoleAssistant, Content: "Looking.", ToolCalls: calls})
 			msgs = append(msgs, results...)
 		}
-		msgs = append(msgs, Message{Role: RoleAssistant, Content: fmt.Sprintf("%d.", round)})
+		msgs = append(msgs, llm.Message{Role: llm.RoleAssistant, Content: fmt.Sprintf("%d.", round)})
 	}
 
 	if reads[1] == 0 {

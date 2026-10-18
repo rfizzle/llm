@@ -13,3 +13,20 @@ import "context"
 type TokenSource interface {
 	Token(ctx context.Context, refused string) (string, error)
 }
+
+// signedOut is the error behind ErrChatGPTSignedOut. It is a comparable value
+// so that errors.Is matches it, and its words are read when it is printed,
+// not when the program starts, so they name the caller set by SetApp.
+type signedOut struct{}
+
+func (signedOut) Error() string {
+	if hint := caller().SignInHint; hint != "" {
+		return "not signed in to ChatGPT; run `" + hint + "`"
+	}
+	return "not signed in to ChatGPT"
+}
+
+// ErrChatGPTSignedOut is the resolution failure of a plan session with no
+// credential to send. It names the command, because the setup that fixes it
+// is a sign-in in a browser, not a key anybody can paste.
+var ErrChatGPTSignedOut error = signedOut{}

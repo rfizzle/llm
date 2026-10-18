@@ -24,12 +24,12 @@ type ResolveOpts struct {
 	ConfigName    string
 	// CacheTTL is the configured lifetime of the request's fixed head, as
 	// the file spells it. A dialect that caches on its own ignores it; one
-	// that has to be told reads it through cacheTTLOrDefault, so an empty or
+	// that has to be told reads it through CacheTTLOrDefault, so an empty or
 	// unreadable value is the default rather than a refusal (cache.go).
 	CacheTTL string
 	// StreamIdleSeconds is how long a turn's stream may go without an event
 	// before the turn fails, as the file spells it: zero for unset, and any
-	// negative to remove the deadline (idle.go).
+	// negative to remove the deadline (internal/idle).
 	StreamIdleSeconds int
 }
 
@@ -52,9 +52,9 @@ type Factory func(ResolveOpts) (Provider, error)
 var registry = map[string]Factory{}
 var defaults = map[string]ProviderDefaults{}
 
-// builtin holds the names the provider files register as the process starts.
-// A profile is read from the person's files later, and its name must not take
-// one of these over.
+// builtin holds the names the backends register as the process starts, each
+// from its own package's init. A profile is read from the person's files
+// later, and its name must not take one of these over.
 var builtin = map[string]bool{}
 
 // Register makes a provider resolvable by name, replacing any earlier one of
@@ -67,8 +67,10 @@ func Register(name string, f Factory) {
 	registry[name] = f
 }
 
-// registerBuiltin registers a provider that ships with the library, once.
-func registerBuiltin(name string, f Factory) {
+// RegisterBuiltin registers a provider that ships with the library, once. A
+// backend package calls it from its init, the way a database/sql driver
+// registers itself, so the built-ins are the backends the app imported.
+func RegisterBuiltin(name string, f Factory) {
 	if builtin[name] {
 		panic(fmt.Sprintf("provider: built-in %q registered twice", name))
 	}

@@ -220,7 +220,7 @@ type ReasoningBlock struct {
 	Redacted  string
 }
 
-// replayFrom is the index of the first message whose reasoning still goes on
+// ReplayFrom is the index of the first message whose reasoning still goes on
 // the wire. Everything before it keeps its blocks in the conversation and
 // sends none of them.
 //
@@ -252,7 +252,7 @@ type ReasoningBlock struct {
 // Moving it costs the prefix cache from that position on, which is why it is
 // the user turn and not the round: within a turn it does not move, and a
 // turn is where the rounds are.
-func replayFrom(messages []Message) int {
+func ReplayFrom(messages []Message) int {
 	lastUser, lastAssistant := -1, -1
 	for i, m := range messages {
 		switch m.Role {

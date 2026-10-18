@@ -26,7 +26,7 @@ import (
 func CompletedToolCalls(calls []ToolCall) []ToolCall {
 	var out []ToolCall
 	for _, tc := range calls {
-		if tc.ID == "" || tc.Name == "" || !wholeArguments(tc.Arguments) {
+		if tc.ID == "" || tc.Name == "" || !WholeArguments(tc.Arguments) {
 			continue
 		}
 		out = append(out, tc)
@@ -34,10 +34,10 @@ func CompletedToolCalls(calls []ToolCall) []ToolCall {
 	return out
 }
 
-// wholeArguments reports whether a call's argument buffer is a complete JSON
+// WholeArguments reports whether a call's argument buffer is a complete JSON
 // value. Empty counts as whole: a tool that takes no arguments is written as
 // `{}` by some dialects and as nothing at all by others.
-func wholeArguments(args string) bool {
+func WholeArguments(args string) bool {
 	if strings.TrimSpace(args) == "" {
 		return true
 	}

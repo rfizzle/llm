@@ -8,6 +8,7 @@ import (
 
 	"github.com/rfizzle/llm"
 	"github.com/rfizzle/llm/internal/testhttp"
+	"github.com/rfizzle/llm/openai"
 	"github.com/rfizzle/llm/pricing"
 )
 
@@ -55,7 +56,7 @@ func Example_streamAToolCall() {
 	}))
 	defer srv.Close()
 
-	p := llm.NewOpenAIResponsesWith(origins.Client(), "sk-demo", srv.URL+"/v1", "demo-model", "")
+	p := openai.NewResponsesWith(origins.Client(), "sk-demo", srv.URL+"/v1", "demo-model", "")
 	events, err := p.StreamCompletion(context.Background(),
 		[]llm.Message{{Role: llm.RoleUser, Content: "What does go.mod say?"}},
 		llm.CompletionOpts{

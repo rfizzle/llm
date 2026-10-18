@@ -13,9 +13,10 @@ It holds what any LLM app needs:
 
 - the message, tool-call, stream and usage types (`llm.Message`, `llm.Tool`,
   `llm.ToolCall`, `llm.StreamEvent`, `llm.Usage`);
-- the backends: Anthropic, OpenAI chat, OpenAI Responses and the ChatGPT plan
-  route, Gemini, OpenRouter and any OpenAI-compatible endpoint, resolved by
-  name with `llm.Resolve`;
+- the backends, each a package of its own: `llm/anthropic`, `llm/openai`
+  (chat completions, the Responses API and the ChatGPT plan route),
+  `llm/gemini`, `llm/openrouter` and `llm/compat` (any OpenAI-compatible
+  endpoint), resolved by name with `llm.Resolve` once imported (below);
 - failure classification and retry, stream idle and keep-alive, prompt-cache
   marking, reasoning effort and model listing;
 - `llm/pricing`, the model price and context table with a snapshot built in;
@@ -35,6 +36,25 @@ It does not hold the app's policy. These stay in the app:
 
 Nothing in the library names an app. It says "llm" until the app says
 otherwise.
+
+## Import the backends
+
+Each backend registers its provider names from its own `init`, the way a
+`database/sql` driver does, so an app links the vendors it ships and no
+others. An app that only resolves them by name imports them for the side
+effect, in one file:
+
+```go
+import (
+	_ "github.com/rfizzle/llm/anthropic"  // anthropic
+	_ "github.com/rfizzle/llm/compat"     // openai-compatible
+	_ "github.com/rfizzle/llm/gemini"     // gemini
+	_ "github.com/rfizzle/llm/openai"     // openai, openai-responses, chatgpt
+	_ "github.com/rfizzle/llm/openrouter" // openrouter
+)
+```
+
+`llm.Available` and `llm.IsBuiltin` answer for what was imported.
 
 ## Name the app
 
@@ -91,7 +111,7 @@ To answer a call, append the assistant message with its `ToolCalls`, then a
 `RoleTool` message with the result and the call's `ToolCallID`, and stream
 again. `Example_streamAToolCall` runs this against an in-process server
 (`internal/testhttp`), so it needs no network; an app passes its own
-`http.Client` the same way through `llm.NewOpenAIResponsesWith`.
+`http.Client` the same way through `openai.NewResponsesWith`.
 
 ## Price a Usage
 
@@ -125,7 +145,7 @@ if err != nil {
 if _, err := acct.Login(ctx, chatgpt.LoginOptions{Say: os.Stdout}); err != nil {
 	return err
 }
-p, err := llm.Resolve("chatgpt", llm.ResolveOpts{TokenSource: acct})
+p, err := llm.Resolve("chatgpt", llm.ResolveOpts{TokenSource: acct}) // with llm/openai imported
 ```
 
 `Login` opens a browser and waits on a loopback callback. `Example_signIn` in

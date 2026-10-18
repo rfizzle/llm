@@ -25,37 +25,19 @@ package llm
 // gateway provider and any profile route speaking that dialect alike, which
 // is why the second is a round tripper anything can be wrapped in rather than
 // one provider's own. The positions have to be the same on both, so they are
-// chosen once here and applied twice — a rule written down twice is a rule
-// that gets corrected once.
+// chosen once, in internal/cachemarks, and applied twice: here for the
+// gateway path and in the anthropic package for the direct one.
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/rfizzle/llm/internal/cachemarks"
 )
-
-// maxCacheMarks is how many cache_control markers one request may carry; the
-// API refuses a fifth. Three are placed, and the spare is the margin that
-// keeps a later marker from having to displace an existing one.
-const maxCacheMarks = 4
-
-// rollingCacheMarks is how many of the conversation's trailing messages are
-// marked.
-//
-// One would be enough if the provider always found the previous round's
-// marker on its own. It searches back a bounded number of blocks from the
-// marker it is given, and a round that ran its tool calls in parallel appends
-// more than that bound: eight requests and the eight results answering them
-// is already sixteen blocks before the reasoning and the reply are counted.
-// The second mark is the previous round's own boundary, named outright so
-// the search never has to reach it.
-const rollingCacheMarks = 2
 
 // CacheTTL is how long a cached prefix outlives the request that wrote it.
 // The API takes these two lifetimes and no others.
@@ -121,95 +103,18 @@ func TakesCacheLease(model string) bool {
 	return anthropicRouted(model) || strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "claude-")
 }
 
-// cacheTTLOrDefault is the lifetime to go out with, given whatever the
+// CacheTTLOrDefault is the lifetime to go out with, given whatever the
 // session was configured with. Nothing it cannot read reaches the wire: an
 // unset value is the default, and so is a value that is neither lifetime,
 // because every surface that writes the key already refuses anything else
 // and what arrives here instead is a hand-edited file — where a typo should
 // cost a setting rather than the ability to run.
-func cacheTTLOrDefault(s string) CacheTTL {
+func CacheTTLOrDefault(s string) CacheTTL {
 	ttl, err := ParseCacheTTL(s)
 	if err != nil {
 		return DefaultCacheTTL
 	}
 	return ttl
-}
-
-// cacheMarks is where one request's markers go, as positions rather than in
-// any dialect's own types: the fixed head — the tools and the system prompt,
-// which the API caches as one prefix because the tools precede the system
-// prompt in it — and the trailing messages whose ends are the round
-// boundaries.
-//
-// The head takes one marker and not two. A marker on the system prompt covers
-// the tools with it, so marking the tools as well would spend a second marker
-// on a prefix the first one already contains.
-type cacheMarks struct {
-	// Head is whether there is a head to mark at all.
-	Head bool
-	// Messages are indexes into the conversation under the head, ascending.
-	Messages []int
-}
-
-// planCacheMarks chooses a request's marker positions from whether it has a
-// head and how many messages sit under it.
-//
-// It marks positions, never content: every marker lands on something the
-// request was already sending. A request the API declines to cache (a prefix
-// under its minimum, a dialect that does not know the field) is answered
-// exactly as it would have been without the markers, which is what makes this
-// safe to send to a gateway too.
-func planCacheMarks(head bool, messages int) cacheMarks {
-	marks := cacheMarks{Head: head}
-	spent := 0
-	if head {
-		spent = 1
-	}
-	for i := max(messages-rollingCacheMarks, 0); i < messages && spent < maxCacheMarks; i++ {
-		marks.Messages = append(marks.Messages, i)
-		spent++
-	}
-	return marks
-}
-
-// markAnthropicCache places the plan's markers on a Messages API request, all
-// of them at the session's lifetime (DefaultCacheTTL).
-func markAnthropicCache(params *anthropic.MessageNewParams, ttl CacheTTL) {
-	ttl = cacheTTLOrDefault(string(ttl))
-	marks := planCacheMarks(len(params.System) > 0, len(params.Messages))
-	if marks.Head {
-		params.System[len(params.System)-1].CacheControl = cacheControl(ttl)
-	}
-	for _, i := range marks.Messages {
-		markLastBlock(params.Messages[i].Content, ttl)
-	}
-}
-
-// cacheControl is one marker at a chosen lifetime.
-func cacheControl(ttl CacheTTL) anthropic.CacheControlEphemeralParam {
-	cc := anthropic.NewCacheControlEphemeralParam()
-	cc.TTL = anthropic.CacheControlEphemeralTTL(ttl)
-	return cc
-}
-
-// markLastBlock marks the last block of a message that can carry a marker,
-// and reports whether it found one.
-//
-// It searches from the end rather than taking the final block outright
-// because not every block type has the field — a turn that is nothing but
-// reasoning ends on a block the API will not accept a marker on, and a marker
-// placed there would be a request rejected for the sake of a saving. Marking
-// an earlier block of the same message is worth doing anyway: the prefix it
-// caches is shorter by the tail of one message and still covers everything
-// before it.
-func markLastBlock(blocks []anthropic.ContentBlockParamUnion, ttl CacheTTL) bool {
-	for i := len(blocks) - 1; i >= 0; i-- {
-		if cc := blocks[i].GetCacheControl(); cc != nil {
-			*cc = cacheControl(ttl)
-			return true
-		}
-	}
-	return false
 }
 
 // markOpenAICacheBody places the same plan on a chat-completions body bound
@@ -227,7 +132,7 @@ func markLastBlock(blocks []anthropic.ContentBlockParamUnion, ttl CacheTTL) bool
 // content to hold a marker — so a request that gains nothing here is byte for
 // byte the request that was sent before any of this existed.
 func markOpenAICacheBody(body []byte, ttl CacheTTL) []byte {
-	ttl = cacheTTLOrDefault(string(ttl))
+	ttl = CacheTTLOrDefault(string(ttl))
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return body
@@ -246,10 +151,10 @@ func markOpenAICacheBody(body []byte, ttl CacheTTL) []byte {
 	// front before the conversation is counted — otherwise the two paths
 	// would mark different rounds of the same conversation.
 	head := -1
-	if len(msgs) > 0 && messageRole(msgs[0]) == string(RoleSystem) {
+	if len(msgs) > 0 && cachemarks.MessageRole(msgs[0]) == string(RoleSystem) {
 		head = 0
 	}
-	marks := planCacheMarks(head == 0, len(msgs)-(head+1))
+	marks := cachemarks.Plan(head == 0, len(msgs)-(head+1))
 
 	marked := false
 	if marks.Head {
@@ -274,18 +179,6 @@ func markOpenAICacheBody(body []byte, ttl CacheTTL) []byte {
 		return body
 	}
 	return out
-}
-
-// messageRole is one message's role, or the empty string when it is not an
-// object carrying one.
-func messageRole(msg json.RawMessage) string {
-	var fields struct {
-		Role string `json:"role"`
-	}
-	if err := json.Unmarshal(msg, &fields); err != nil {
-		return ""
-	}
-	return fields.Role
 }
 
 // markOpenAIContentPart marks the last text part of one message, promoting a
@@ -373,7 +266,7 @@ func NewCacheMarkTransport(base http.RoundTripper, cacheTTL string) http.RoundTr
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	return &cacheMarkTransport{base: base, ttl: cacheTTLOrDefault(cacheTTL)}
+	return &cacheMarkTransport{base: base, ttl: CacheTTLOrDefault(cacheTTL)}
 }
 
 type cacheMarkTransport struct {
@@ -413,93 +306,4 @@ func (t *cacheMarkTransport) mark(req *http.Request) error {
 		return io.NopCloser(bytes.NewReader(body)), nil
 	}
 	return nil
-}
-
-// NewOpenAIPromptCacheTransport gives GPT-5.6 chat-completions requests the
-// same explicit cache steering that the Responses path uses. The SDK has no
-// fields for these newer wire controls, so the encoded request is the one
-// place the legacy dialect can still send them.
-func NewOpenAIPromptCacheTransport(base http.RoundTripper) http.RoundTripper {
-	if base == nil {
-		base = http.DefaultTransport
-	}
-	return &openAIPromptCacheTransport{base: base}
-}
-
-type openAIPromptCacheTransport struct {
-	base http.RoundTripper
-}
-
-func (t *openAIPromptCacheTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = req.Clone(req.Context())
-	if err := t.mark(req); err != nil {
-		return nil, err
-	}
-	return t.base.RoundTrip(req)
-}
-
-func (t *openAIPromptCacheTransport) mark(req *http.Request) error {
-	if req.Body == nil {
-		return nil
-	}
-	body, err := io.ReadAll(req.Body)
-	req.Body.Close()
-	if err != nil {
-		return err
-	}
-	body = markOpenAIChatPromptCacheBody(body)
-	req.Body = io.NopCloser(bytes.NewReader(body))
-	req.ContentLength = int64(len(body))
-	req.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(body)), nil
-	}
-	return nil
-}
-
-// markOpenAIChatPromptCacheBody adds only the GPT-5.6 chat controls. An
-// unreadable or unfamiliar body is returned untouched, so endpoints that
-// merely share the SDK's client do not acquire an unsupported field.
-func markOpenAIChatPromptCacheBody(body []byte) []byte {
-	var envelope map[string]json.RawMessage
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return body
-	}
-	var model string
-	if err := json.Unmarshal(envelope["model"], &model); err != nil || !responsesExplicitCache(model) {
-		return body
-	}
-	if _, exists := envelope["prompt_cache_key"]; exists {
-		return body
-	}
-
-	key := chatPromptCacheKey(model, envelope["messages"], envelope["tools"])
-	encodedKey, _ := json.Marshal(key)
-	envelope["prompt_cache_key"] = encodedKey
-	envelope["prompt_cache_options"] = json.RawMessage(`{"ttl":"30m"}`)
-	marked, err := json.Marshal(envelope)
-	if err != nil {
-		return body
-	}
-	return marked
-}
-
-// chatPromptCacheKey hashes the system messages and tool definitions that
-// remain fixed while a conversation grows. It is a routing hint rather than a
-// cache lookup key, so the actual prompt still decides whether it is reused.
-func chatPromptCacheKey(model string, messages, tools json.RawMessage) string {
-	h := sha256.New()
-	_, _ = h.Write([]byte(model))
-	_, _ = h.Write([]byte{0})
-	var rawMessages []json.RawMessage
-	if json.Unmarshal(messages, &rawMessages) == nil {
-		for _, message := range rawMessages {
-			if messageRole(message) != string(RoleSystem) {
-				continue
-			}
-			_, _ = h.Write(message)
-			_, _ = h.Write([]byte{0})
-		}
-	}
-	_, _ = h.Write(tools)
-	return caller().Name + "-" + fmt.Sprintf("%x", h.Sum(nil))
 }

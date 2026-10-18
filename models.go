@@ -2,64 +2,20 @@ package llm
 
 import (
 	"context"
-	"sort"
 	"strings"
-
-	openai "github.com/sashabaranov/go-openai"
 )
 
 // knownModels is the curated per-provider model catalog backing the /model
 // interactive picker. It is a convenience list, not a gate — /model <name>
 // accepts any name, and providers registered without a catalog (e.g.
 // openai-compatible endpoints, whose models are whatever the endpoint hosts)
-// simply have no picker entries beyond the session's own model.
-var knownModels = map[string][]string{
-	"anthropic": {
-		"claude-fable-5-1",
-		"claude-opus-5",
-		"claude-sonnet-5",
-		"claude-opus-4-8",
-		"claude-opus-4-7",
-		"claude-haiku-4-5",
-	},
-	"openai": {
-		"gpt-5.6",
-		"gpt-5.5",
-		"gpt-5.4",
-		"gpt-5.4-mini",
-		"gpt-5.4-nano",
-		"gpt-4.1",
-		"gpt-4o",
-	},
-	// The Responses API serves the reasoning families; the chat-completions
-	// models are reachable through it too.
-	"openai-responses": {
-		"gpt-5.6",
-		"gpt-5.5",
-		"gpt-5.4",
-		"gpt-5.4-mini",
-		"gpt-5.4-nano",
-		"gpt-4.1",
-		"o3",
-	},
-	"gemini": {
-		"gemini-3.7-flash",
-		"gemini-3.1-pro-preview",
-		"gemini-2.5-pro",
-		"gemini-2.5-flash",
-	},
-	"openrouter": {
-		"anthropic/claude-opus-5",
-		"anthropic/claude-sonnet-4.6",
-		"anthropic/claude-haiku-4.5",
-		"openai/gpt-5.2",
-		"google/gemini-3.1-pro-preview",
-	},
-}
+// simply have no picker entries beyond the session's own model. Each built-in
+// backend registers its own catalog from its init.
+var knownModels = map[string][]string{}
 
-// RegisterModels adds a catalog for a provider registered at runtime — a
-// gateway profile declaring what it hosts (internal/profile). It replaces any
-// existing catalog for that name.
+// RegisterModels adds a catalog for a provider: a built-in backend's own, from
+// its init, or one registered at runtime, such as a gateway profile declaring
+// what it hosts. It replaces any existing catalog for that name.
 func RegisterModels(name string, models []string) {
 	if len(models) == 0 {
 		delete(knownModels, normalizeName(name))
@@ -110,66 +66,6 @@ type ModelLister interface {
 // same round trip again for every /model switch.
 type ModelWindower interface {
 	ModelWindows(ctx context.Context) (map[string]int64, error)
-}
-
-// listOpenAIModels enumerates an openai-compatible endpoint's models, sorted
-// and filtered to the chat-capable ones.
-func listOpenAIModels(ctx context.Context, c *openai.Client) ([]string, error) {
-	list, err := c.ListModels(ctx)
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(list.Models))
-	for _, mdl := range list.Models {
-		if mdl.ID != "" {
-			names = append(names, mdl.ID)
-		}
-	}
-	names = chatModels(names)
-	sort.Strings(names)
-	return names, nil
-}
-
-// nonChatMarkers are id fragments belonging to families that can't serve a
-// chat completion. The big hosted catalogs list embeddings, speech, and image
-// models next to the chat ones; local runtimes list embedding models too.
-var nonChatMarkers = []string{
-	"embed",
-	"whisper",
-	"tts",
-	"audio",
-	"speech",
-	"transcribe",
-	"dall-e",
-	"moderation",
-	"image",
-	"rerank",
-	"stable-diffusion",
-	"clip",
-}
-
-// chatModels drops the ids that name a non-chat family. A filter that would
-// empty the list is discarded instead — an unfamiliar naming scheme should
-// leave the user with every model, not none.
-func chatModels(names []string) []string {
-	kept := make([]string, 0, len(names))
-	for _, name := range names {
-		lower := strings.ToLower(name)
-		drop := false
-		for _, marker := range nonChatMarkers {
-			if strings.Contains(lower, marker) {
-				drop = true
-				break
-			}
-		}
-		if !drop {
-			kept = append(kept, name)
-		}
-	}
-	if len(kept) == 0 {
-		return names
-	}
-	return kept
 }
 
 // What a session assumes when the pricing table has never heard of the model.
