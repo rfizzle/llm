@@ -110,7 +110,7 @@ func TestGeminiThinkingConfig_UsesTheModelNativeControl(t *testing.T) {
 }
 
 func TestNewGemini_MissingKey(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
+	t.Setenv("ACME_API_KEY", "")
 	t.Setenv("GEMINI_API_KEY", "")
 	if err := os.Unsetenv("GEMINI_API_KEY"); err != nil {
 		t.Fatal(err)

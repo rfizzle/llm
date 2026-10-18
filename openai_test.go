@@ -34,7 +34,7 @@ func TestOpenAI_DefaultModel(t *testing.T) {
 }
 
 func TestNewOpenAI_MissingKey(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
+	t.Setenv("ACME_API_KEY", "")
 	t.Setenv("OPENAI_API_KEY", "")
 	_, err := NewOpenAI(ResolveOpts{})
 	if err == nil {

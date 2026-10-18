@@ -254,12 +254,12 @@ func TestClassify_PassesAClassifiedFailureThrough(t *testing.T) {
 }
 
 func TestClassify_CarriesTheKeyItSent(t *testing.T) {
-	classify := newClassifier("openai", "SHHH_API_KEY or OPENAI_API_KEY", "sk-live-abcd4f9c")
+	classify := newClassifier("openai", "ACME_API_KEY or OPENAI_API_KEY", "sk-live-abcd4f9c")
 	f, _ := AsFailure(classify(&openai.APIError{HTTPStatusCode: 401, Message: "nope"}))
 	if f.KeyTail != "4f9c" {
 		t.Errorf("KeyTail = %q, want the last four characters", f.KeyTail)
 	}
-	if f.KeyEnv != "SHHH_API_KEY or OPENAI_API_KEY" {
+	if f.KeyEnv != "ACME_API_KEY or OPENAI_API_KEY" {
 		t.Errorf("KeyEnv = %q", f.KeyEnv)
 	}
 	if f.Provider != "openai" {
@@ -350,7 +350,7 @@ func TestClassify_NilStaysNil(t *testing.T) {
 // only place a failure is named — and a cancellation does not, because it is
 // the reader pressing Esc rather than anything going wrong.
 func TestClassify_WritesTheRefusalToTheLog(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "shhh.log")
+	path := filepath.Join(t.TempDir(), "acme.log")
 	f, err := os.Create(path)
 	if err != nil {
 		t.Fatal(err)

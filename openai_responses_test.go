@@ -228,7 +228,7 @@ func TestOpenAIResponses_BuildsTheInputList(t *testing.T) {
 		t.Fatalf("the system prompt belongs in instructions, got %q", got.Instructions)
 	}
 	if got.Store {
-		t.Fatal("shhh sends the whole conversation; the endpoint should not store it")
+		t.Fatal("the app sends the whole conversation; the endpoint should not store it")
 	}
 	if got.PromptCacheKey == "" || got.PromptCacheOptions == nil || got.PromptCacheOptions.TTL != "30m" {
 		t.Fatalf("a GPT-5.6 request should opt into the durable cache route, got %+v / %+v", got.PromptCacheKey, got.PromptCacheOptions)
@@ -255,7 +255,7 @@ func TestOpenAIResponses_BuildsTheInputList(t *testing.T) {
 		t.Fatalf("tools are flattened in this dialect: %+v", got.Tools)
 	}
 	if got.Tools[0].Strict == nil || *got.Tools[0].Strict {
-		t.Fatal("strict mode would reject shhh's permissive schemas")
+		t.Fatal("strict mode would reject the app's permissive schemas")
 	}
 }
 
@@ -351,9 +351,9 @@ func TestOpenAIResponses_ListModels(t *testing.T) {
 }
 
 func TestNewOpenAIResponses_RequiresAKey(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
+	t.Setenv("ACME_API_KEY", "")
 	t.Setenv("OPENAI_API_KEY", "")
-	t.Setenv("SHHH_BASE_URL", "")
+	t.Setenv("ACME_BASE_URL", "")
 	if _, err := NewOpenAIResponses(ResolveOpts{}); err == nil {
 		t.Fatal("expected a missing-key error")
 	}
@@ -774,7 +774,7 @@ func TestOpenAIResponses_ReplaysOnlyTheCurrentChain(t *testing.T) {
 		{Role: RoleAssistant, Content: "one file", Reasoning: sealed("rs_answer")},
 		{Role: RoleUser, Content: "read it"},
 		{Role: RoleAssistant, Reasoning: sealed("rs_now"), ToolCalls: []ToolCall{{ID: "call_2", Name: "bash", Arguments: "{}"}}},
-		{Role: RoleTool, ToolCallID: "call_2", Content: "module shhh"},
+		{Role: RoleTool, ToolCallID: "call_2", Content: "module acme"},
 	}, CompletionOpts{Effort: EffortHigh})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

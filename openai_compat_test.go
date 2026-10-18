@@ -33,8 +33,8 @@ func TestOpenAICompat_DefaultModel(t *testing.T) {
 }
 
 func TestNewOpenAICompat_Defaults(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
-	t.Setenv("SHHH_BASE_URL", "")
+	t.Setenv("ACME_API_KEY", "")
+	t.Setenv("ACME_BASE_URL", "")
 
 	p, err := NewOpenAICompat(ResolveOpts{})
 	if err != nil {
@@ -49,8 +49,8 @@ func TestNewOpenAICompat_Defaults(t *testing.T) {
 }
 
 func TestNewOpenAICompat_EnvOverrides(t *testing.T) {
-	t.Setenv("SHHH_BASE_URL", "http://myhost:8080/v1")
-	t.Setenv("SHHH_API_KEY", "my-key")
+	t.Setenv("ACME_BASE_URL", "http://myhost:8080/v1")
+	t.Setenv("ACME_API_KEY", "my-key")
 
 	p, err := NewOpenAICompat(ResolveOpts{})
 	if err != nil {
@@ -62,7 +62,7 @@ func TestNewOpenAICompat_EnvOverrides(t *testing.T) {
 }
 
 func TestNewOpenAICompat_OptsOverrideEnvAndDefaults(t *testing.T) {
-	t.Setenv("SHHH_BASE_URL", "http://env-host:9999/v1")
+	t.Setenv("ACME_BASE_URL", "http://env-host:9999/v1")
 
 	p, err := NewOpenAICompat(ResolveOpts{
 		BaseURL: "http://flag-host:1234/v1",
@@ -80,7 +80,7 @@ func TestNewOpenAICompat_OptsOverrideEnvAndDefaults(t *testing.T) {
 }
 
 func TestNewOpenAICompat_NoKeyRequired(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
+	t.Setenv("ACME_API_KEY", "")
 	_, err := NewOpenAICompat(ResolveOpts{})
 	if err != nil {
 		t.Fatalf("compat provider should not require an API key, got: %v", err)

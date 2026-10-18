@@ -1,8 +1,10 @@
 package pricing
 
 import (
+	"bytes"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -126,6 +128,32 @@ func TestLoadFromFile_ContextWindowOnlyEntry(t *testing.T) {
 	}
 	if _, _, found := table.Cost("ollama/llama3", 1, 1); found {
 		t.Fatal("zero-cost entries should not report a cost")
+	}
+}
+
+func TestPrice_ChargesEachPartAtItsOwnRate(t *testing.T) {
+	table := NewTable(map[string]ModelPricing{
+		"m": {InputCostPerToken: 2e-6, OutputCostPerToken: 8e-6, CacheReadCostPerToken: 2e-7, CacheCreationCostPerToken: 4e-6},
+	})
+	got, found := table.Price("m", 10_000, 500, 6_000, 1_000)
+	// 3000 fresh at 2e-6, 6000 read at 2e-7, 1000 written at 4e-6, 500 out at 8e-6.
+	const want = 3000*2e-6 + 6000*2e-7 + 1000*4e-6 + 500*8e-6
+	if !found || math.Abs(got-want) > 1e-12 {
+		t.Errorf("Price = %v, %v; want %v", got, found, want)
+	}
+	if _, found := table.Price("absent", 1, 1, 0, 0); found {
+		t.Error("a model with no price came back priced")
+	}
+}
+
+func TestSnapshotJSON_IsACopyOfTheEmbeddedTable(t *testing.T) {
+	a := SnapshotJSON()
+	if !bytes.Equal(a, snapshot) {
+		t.Fatal("SnapshotJSON differs from the embedded table")
+	}
+	a[0] = 'X'
+	if SnapshotJSON()[0] == 'X' {
+		t.Error("SnapshotJSON handed out the embedded slice")
 	}
 }
 

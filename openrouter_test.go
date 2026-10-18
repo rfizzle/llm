@@ -49,7 +49,7 @@ func TestOpenRouter_DefaultModel(t *testing.T) {
 }
 
 func TestNewOpenRouter_MissingKey(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
+	t.Setenv("ACME_API_KEY", "")
 	t.Setenv("OPENROUTER_API_KEY", "")
 	if err := os.Unsetenv("OPENROUTER_API_KEY"); err != nil {
 		t.Fatal(err)
@@ -103,13 +103,13 @@ func TestOpenRouter_SendsRequiredHeaders(t *testing.T) {
 	for range ch {
 	}
 
-	if gotReferer != "https://github.com/rfizzle/shhh" {
+	if gotReferer != "https://example.com/acme" {
 		t.Errorf("expected HTTP-Referer header, got %q", gotReferer)
 	}
-	if gotTitle != "shhh" {
+	if gotTitle != "acme" {
 		t.Errorf("expected X-Title header, got %q", gotTitle)
 	}
-	if gotSession == "" || !strings.HasPrefix(gotSession, "shhh-") {
+	if gotSession == "" || !strings.HasPrefix(gotSession, "acme-") {
 		t.Errorf("expected opaque X-Session-Id header, got %q", gotSession)
 	}
 }
@@ -350,7 +350,7 @@ func TestOpenRouter_StreamCompletion_MarksNothingForAnotherVendor(t *testing.T) 
 // The configured lifetime reaches every marker the request carries, which is
 // the whole of what the setting decides.
 func TestOpenRouter_StreamCompletion_HonoursTheConfiguredCacheLifetime(t *testing.T) {
-	t.Setenv("SHHH_BASE_URL", "")
+	t.Setenv("ACME_BASE_URL", "")
 	body := captureChatRequest(t, func(baseURL string) (<-chan StreamEvent, error) {
 		return newTestOpenRouterWithCache(baseURL, "anthropic/claude-sonnet-4-6", "5m").StreamCompletion(
 			context.Background(),

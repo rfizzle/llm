@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rfizzle/llm"
 	"github.com/rfizzle/llm/internal/testhttp"
 )
 
@@ -173,6 +174,55 @@ func TestToken_ALockTimeoutIsADeadline(t *testing.T) {
 	close(release)
 	if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrSignInRequired) {
 		t.Errorf("Token behind a held lock = %v, want a deadline", err)
+	}
+}
+
+// The lock-wait sentence names the app and the wait, and keeps the deadline
+// underneath. The wait is the account's lockWait, a field a test shortens;
+// Open sets it to thirty seconds.
+func TestToken_ALockTimeoutSentenceNamesTheAppAndTheWait(t *testing.T) {
+	clock := newClock()
+	_, client := newFakeAuth(t, clock)
+	dir := t.TempDir()
+	holder := openTest(t, dir, client, clock, nil)
+	waiter := openTest(t, dir, client, clock, nil)
+	if waiter.lockWait != 30*time.Second {
+		t.Fatalf("the default lock wait = %s, want 30s", waiter.lockWait)
+	}
+	waiter.lockWait = 20 * time.Millisecond
+	seed(t, holder, clock, time.Minute)
+	release := make(chan struct{})
+	held := make(chan struct{})
+	go func() {
+		_ = holder.withLock(context.Background(), func() error { close(held); <-release; return nil })
+	}()
+	<-held
+	_, err := waiter.Token(context.Background(), "")
+	close(release)
+	const want = "another acme has held the ChatGPT sign-in for 20ms; try again: context deadline exceeded"
+	if err == nil || err.Error() != want {
+		t.Errorf("Token behind a held lock = %v, want %q", err, want)
+	}
+}
+
+// One llm.SetApp is enough: an account opened with no App of its own says
+// the app that was set, and an App given to Options wins over it.
+func TestOpen_AFollowsTheAppHandedToLLM(t *testing.T) {
+	llm.SetApp(llm.App{Name: "hearth", EnvPrefix: "HEARTH", SignInHint: "hearth login"})
+	t.Cleanup(func() { llm.SetApp(testApp) })
+	a, err := Open(Options{Store: FileStore{Dir: t.TempDir()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.app.Name != "hearth" || a.app.SignInHint != "hearth login" {
+		t.Errorf("zero Options.App gave %+v", a.app)
+	}
+	b, err := Open(Options{App: testApp, Store: FileStore{Dir: t.TempDir()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.app.Name != "acme" {
+		t.Errorf("an explicit App gave %+v", b.app)
 	}
 }
 

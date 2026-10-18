@@ -1,4 +1,4 @@
-# The linter gate behind `make lint`, set the way shhh's is: the default set —
+# The linter gate behind `make lint`, set to the gate's defaults: the default set —
 # errcheck, govet, ineffassign, staticcheck, unused — with one carve-out for
 # the returns the tree leaves unchecked where nothing could be done with them
 # (`defer x.Close()`, `fmt.Fprint*` to a buffer, `fmt.Sscanf` on a value whose

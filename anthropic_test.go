@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewAnthropic_RequiresKey(t *testing.T) {
-	t.Setenv("SHHH_API_KEY", "")
+	t.Setenv("ACME_API_KEY", "")
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	if _, err := NewAnthropic(ResolveOpts{}); err == nil {
 		t.Fatal("expected error without API key")

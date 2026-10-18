@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Regenerate the model-data snapshot shhh ships inside the binary.
+"""Regenerate the model-data snapshot the pricing package embeds.
 
-The snapshot is the public LiteLLM table trimmed to the providers shhh speaks
+The snapshot is the public LiteLLM table trimmed to the providers the library speaks
 and the fields it reads, so a fresh or offline install still knows what a
 model costs and how it spells its thinking level. The downloaded table is
 overlaid on it at runtime; this file is the floor, not the source of truth.

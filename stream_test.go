@@ -194,7 +194,7 @@ func TestStream_GeminiReportsTheWholeCallAsOneFragment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &Gemini{client: client, model: "gemini-2.5-flash", classify: newClassifier("gemini", "SHHH_API_KEY", "test-key")}
+	g := &Gemini{client: client, model: "gemini-2.5-flash", classify: newClassifier("gemini", "ACME_API_KEY", "test-key")}
 
 	ch, err := g.StreamCompletion(context.Background(), []Message{{Role: RoleUser, Content: "write main.go"}}, CompletionOpts{})
 	if err != nil {
@@ -283,7 +283,7 @@ func TestStream_GeminiCeilingNamesTheEndingAndKeepsWhatArrivedWhole(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &Gemini{client: client, model: "gemini-2.5-flash", classify: newClassifier("gemini", "SHHH_API_KEY", "test-key")}
+	g := &Gemini{client: client, model: "gemini-2.5-flash", classify: newClassifier("gemini", "ACME_API_KEY", "test-key")}
 
 	ch, err := g.StreamCompletion(context.Background(), []Message{{Role: RoleUser, Content: "write main.go"}}, CompletionOpts{})
 	if err != nil {

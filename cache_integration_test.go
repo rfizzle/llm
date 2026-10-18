@@ -23,8 +23,8 @@ import (
 //
 // It costs real requests, so it runs only when pointed at an endpoint:
 //
-//	SHHH_CACHE_IT_URL=https://api.anthropic.com \
-//	SHHH_CACHE_IT_KEY=sk-… \
+//	ACME_CACHE_IT_URL=https://api.anthropic.com \
+//	ACME_CACHE_IT_KEY=sk-… \
 //	go test ./internal/provider -run CacheIntegration -v
 //
 // The prefix is deliberately far above the minimum cacheable size. That
@@ -32,11 +32,11 @@ import (
 // near it produces a run that reports no caching and does not say whether the
 // cause was the size or the endpoint.
 func TestPromptCacheIntegration(t *testing.T) {
-	base, key := os.Getenv("SHHH_CACHE_IT_URL"), os.Getenv("SHHH_CACHE_IT_KEY")
+	base, key := os.Getenv("ACME_CACHE_IT_URL"), os.Getenv("ACME_CACHE_IT_KEY")
 	if base == "" || key == "" {
-		t.Skip("set SHHH_CACHE_IT_URL and SHHH_CACHE_IT_KEY to run")
+		t.Skip("set ACME_CACHE_IT_URL and ACME_CACHE_IT_KEY to run")
 	}
-	model := os.Getenv("SHHH_CACHE_IT_MODEL")
+	model := os.Getenv("ACME_CACHE_IT_MODEL")
 	if model == "" {
 		model = defaultAnthropicModel
 	}
@@ -132,11 +132,11 @@ const parallelCacheCalls = 8
 // calls, which is the round where the boundary has to be named rather than
 // found. Run it with `make cache-check`.
 func TestPromptCacheIntegrationOverAConversation(t *testing.T) {
-	base, key := os.Getenv("SHHH_CACHE_IT_URL"), os.Getenv("SHHH_CACHE_IT_KEY")
+	base, key := os.Getenv("ACME_CACHE_IT_URL"), os.Getenv("ACME_CACHE_IT_KEY")
 	if base == "" || key == "" {
-		t.Skip("set SHHH_CACHE_IT_URL and SHHH_CACHE_IT_KEY to run")
+		t.Skip("set ACME_CACHE_IT_URL and ACME_CACHE_IT_KEY to run")
 	}
-	model := first(os.Getenv("SHHH_CACHE_IT_MODEL"), defaultAnthropicModel)
+	model := first(os.Getenv("ACME_CACHE_IT_MODEL"), defaultAnthropicModel)
 
 	p, err := NewAnthropic(ResolveOpts{APIKey: key, BaseURL: base, Model: model})
 	if err != nil {
@@ -154,17 +154,17 @@ func TestPromptCacheIntegrationOverAConversation(t *testing.T) {
 // one that forwards them answers. Only the bill differs, so only a live run
 // can tell them apart.
 //
-//	SHHH_CACHE_IT_GATEWAY_URL=https://openrouter.ai/api/v1 \
-//	SHHH_CACHE_IT_GATEWAY_KEY=sk-… \
+//	ACME_CACHE_IT_GATEWAY_URL=https://openrouter.ai/api/v1 \
+//	ACME_CACHE_IT_GATEWAY_KEY=sk-… \
 //	go test ./internal/provider -run CacheIntegration -v
 func TestPromptCacheIntegrationThroughAGateway(t *testing.T) {
-	base, key := os.Getenv("SHHH_CACHE_IT_GATEWAY_URL"), os.Getenv("SHHH_CACHE_IT_GATEWAY_KEY")
+	base, key := os.Getenv("ACME_CACHE_IT_GATEWAY_URL"), os.Getenv("ACME_CACHE_IT_GATEWAY_KEY")
 	if base == "" || key == "" {
-		t.Skip("set SHHH_CACHE_IT_GATEWAY_URL and SHHH_CACHE_IT_GATEWAY_KEY to run")
+		t.Skip("set ACME_CACHE_IT_GATEWAY_URL and ACME_CACHE_IT_GATEWAY_KEY to run")
 	}
 	// The model has to be one the gateway routes to that API — nothing else
 	// is being asked about — so the default is the gateway provider's own.
-	model := first(os.Getenv("SHHH_CACHE_IT_GATEWAY_MODEL"), defaultOpenRouterModel)
+	model := first(os.Getenv("ACME_CACHE_IT_GATEWAY_MODEL"), defaultOpenRouterModel)
 	if !anthropicRouted(model) {
 		t.Fatalf("%q is not routed to the Messages API, so there is nothing here to cache", model)
 	}

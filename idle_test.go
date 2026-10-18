@@ -136,7 +136,7 @@ func TestIdle_GeminiStreamThatGoesQuietFails(t *testing.T) {
 		client:       client,
 		model:        "gemini-2.5-flash",
 		idleDeadline: idleDeadline{after: testIdle},
-		classify:     newClassifier("gemini", "SHHH_API_KEY", "test-key"),
+		classify:     newClassifier("gemini", "ACME_API_KEY", "test-key"),
 	}
 
 	ch, err := g.StreamCompletion(context.Background(), []Message{{Role: RoleUser, Content: "hello"}}, CompletionOpts{})

@@ -109,7 +109,7 @@ func streamOK(w http.ResponseWriter, events ...string) {
 func hi() []Message { return []Message{{Role: RoleUser, Content: "hi"}} }
 
 func TestChatGPT_BearerComesFromTheSource(t *testing.T) {
-	t.Setenv("SHHH_BASE_URL", "http://env.invalid/v1")
+	t.Setenv("ACME_BASE_URL", "http://env.invalid/v1")
 	src := &fakeTokens{tokens: []string{"plan-token-1"}}
 	var auth, host, path string
 	p := newTestChatGPT(t, src, func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,7 @@ func TestChatGPT_BearerComesFromTheSource(t *testing.T) {
 
 func TestChatGPT_NeverReadsTheKeyEnv(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "sk-env-openai")
-	t.Setenv("SHHH_API_KEY", "sk-env-shhh")
+	t.Setenv("ACME_API_KEY", "sk-env-acme")
 	var auth string
 	var reg testhttp.Registry
 	srv := reg.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +191,7 @@ func TestOpenAIResponses_NeverReadsTheSource(t *testing.T) {
 }
 
 func TestChatGPT_SignedOutFailsToResolve(t *testing.T) {
-	signInRequired := errors.New("the ChatGPT sign-in has expired; run `shhh providers login chatgpt`")
+	signInRequired := errors.New("the ChatGPT sign-in has expired; run `acme login chatgpt`")
 	for _, c := range []struct {
 		name string
 		src  TokenSource
@@ -262,7 +262,7 @@ func TestChatGPT_401RefreshesOnceThenFails(t *testing.T) {
 		if n := requests.Load(); n != 1 {
 			t.Fatalf("the same token is not sent twice, got %d requests", n)
 		}
-		if f.KeyEnv != "shhh providers login chatgpt" || f.KeyTail != "" {
+		if f.KeyEnv != "acme login chatgpt" || f.KeyTail != "" {
 			t.Fatalf("the auth row offers the sign-in and names no key: env %q tail %q", f.KeyEnv, f.KeyTail)
 		}
 	})
@@ -300,7 +300,7 @@ func TestChatGPT_ASourceThatCannotAnswerIsClassified(t *testing.T) {
 	}{
 		{"cancelled", context.Canceled, ClassCancelled},
 		{"the sign-in server unreachable", netFailure{}, ClassNetwork},
-		{"the sign-in expired", errors.New("the ChatGPT sign-in has expired; run `shhh providers login chatgpt`"), ClassAuth},
+		{"the sign-in expired", errors.New("the ChatGPT sign-in has expired; run `acme login chatgpt`"), ClassAuth},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			src := &fakeTokens{tokens: []string{"tok"}}
@@ -335,7 +335,7 @@ func TestChatGPT_ASourceThatCannotAnswerIsClassified(t *testing.T) {
 func TestPlanShape_PinsTheBody(t *testing.T) {
 	image := Attachment{Kind: AttachmentImage, Name: "shot.png", Handle: "Image#1", MediaType: "image/png", Data: []byte("not-a-png")}
 	messages := []Message{
-		{Role: RoleSystem, Content: "You are shhh."},
+		{Role: RoleSystem, Content: "You are acme."},
 		{Role: RoleUser, Content: "what does this show", Attachments: []Attachment{image}},
 		{
 			Role:      RoleAssistant,
@@ -361,7 +361,7 @@ func TestPlanShape_PinsTheBody(t *testing.T) {
 			},
 			want: `{
 				"model": "gpt-5.6-terra",
-				"instructions": "You are shhh.",
+				"instructions": "You are acme.",
 				"stream": true,
 				"store": false,
 				"input": [
@@ -370,11 +370,11 @@ func TestPlanShape_PinsTheBody(t *testing.T) {
 						{"type":"input_image","image_url":` + jsonString(image.DataURL()) + `},
 						{"type":"input_text","text":"what does this show"}
 					]},
-					{"type":"function_call","call_id":"call_1","name":"bash","namespace":"shhh","arguments":"{\"command\":\"ls\"}"},
+					{"type":"function_call","call_id":"call_1","name":"bash","namespace":"acme","arguments":"{\"command\":\"ls\"}"},
 					{"type":"function_call_output","call_id":"call_1","output":"go.mod"}
 				],
 				"tools": [
-					{"type":"namespace","name":"shhh","description":"The tools this session can call.","tools":[
+					{"type":"namespace","name":"acme","description":"The tools this session can call.","tools":[
 						{"type":"function","name":"bash","description":"Run a command.","parameters":{"type":"object"},"strict":false},
 						{"type":"function","name":"read_file","description":"Read a file.","parameters":{"type":"object"},"strict":false}
 					]}
@@ -386,7 +386,7 @@ func TestPlanShape_PinsTheBody(t *testing.T) {
 			opts: CompletionOpts{Tools: tools, ToolChoice: ToolChoiceNone},
 			want: `{
 				"model": "gpt-5.6-terra",
-				"instructions": "You are shhh.",
+				"instructions": "You are acme.",
 				"stream": true,
 				"store": false,
 				"input": [
@@ -408,7 +408,7 @@ func TestPlanShape_PinsTheBody(t *testing.T) {
 			},
 			want: `{
 				"model": "gpt-5.6-terra",
-				"instructions": "You are shhh.",
+				"instructions": "You are acme.",
 				"stream": true,
 				"store": false,
 				"input": [
@@ -478,11 +478,11 @@ func TestPlanTools_RoundTripNames(t *testing.T) {
 	p := newTestChatGPT(t, &fakeTokens{tokens: []string{"tok"}}, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		for _, ev := range []string{
-			`data: {"type":"response.output_item.done","item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"read_file","namespace":"shhh","arguments":"{}"}}`,
+			`data: {"type":"response.output_item.done","item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"read_file","namespace":"acme","arguments":"{}"}}`,
 			`data: {"type":"response.completed","response":{"status":"completed","output":[` +
-				`{"type":"function_call","id":"fc_1","call_id":"call_1","name":"read_file","namespace":"shhh","arguments":"{}"},` +
-				`{"type":"function_call","id":"fc_2","call_id":"call_2","name":"shhh.bash","arguments":"{}"},` +
-				`{"type":"function_call","id":"fc_3","call_id":"call_3","name":"shhh.unknown","arguments":"{}"}]}}`,
+				`{"type":"function_call","id":"fc_1","call_id":"call_1","name":"read_file","namespace":"acme","arguments":"{}"},` +
+				`{"type":"function_call","id":"fc_2","call_id":"call_2","name":"acme.bash","arguments":"{}"},` +
+				`{"type":"function_call","id":"fc_3","call_id":"call_3","name":"acme.unknown","arguments":"{}"}]}}`,
 		} {
 			fmt.Fprintf(w, "%s\n\n", ev)
 		}
@@ -500,8 +500,8 @@ func TestPlanTools_RoundTripNames(t *testing.T) {
 	for _, c := range calls {
 		names = append(names, c.Name)
 	}
-	if got := strings.Join(names, ","); got != "read_file,bash,shhh.unknown" {
-		t.Fatalf("calls should come back under shhh's own names, and an unknown one as it came: %s", got)
+	if got := strings.Join(names, ","); got != "read_file,bash,acme.unknown" {
+		t.Fatalf("calls should come back under the app's own names, and an unknown one as it came: %s", got)
 	}
 }
 

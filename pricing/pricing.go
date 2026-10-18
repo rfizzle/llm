@@ -328,6 +328,22 @@ func (t *Table) CostTokens(model string, tk Tokens) (inputCost, outputCost float
 	return inputCost, float64(tk.Output) * p.OutputCostPerToken, true
 }
 
+// Price is the dollar cost of one request from the counts a provider
+// reports, which is what llm.Usage carries: prompt is every input token
+// billed, cached and created included (both are subsets of it), and
+// completion is the output. It splits the input into its three rates and
+// prices it with CostTokens, and found is false for a model the table has no
+// price for. A pure function of the table and the counts: a caller adds the
+// cost up itself and decides what to do with a request that has none.
+func (t *Table) Price(model string, prompt, completion, cached, created int64) (cost float64, found bool) {
+	in, out, found := t.CostTokens(model, Tokens{Input: prompt - cached - created, Cached: cached, Created: created, Output: completion})
+	return in + out, found
+}
+
+// SnapshotJSON is the built-in model table as the JSON document it is
+// stored in, for a caller that seeds a cache with it. The slice is a copy.
+func SnapshotJSON() []byte { return append([]byte(nil), snapshot...) }
+
 // ContextWindow returns the model's context window (max input tokens) when
 // the table knows it.
 func (t *Table) ContextWindow(model string) (int64, bool) {

@@ -9,17 +9,17 @@ import (
 	"testing"
 )
 
-var shhhApp = App{
-	Name:       "shhh",
-	EnvPrefix:  "SHHH",
-	SignInHint: "shhh providers login chatgpt",
-	URL:        "https://github.com/rfizzle/shhh",
+var acmeApp = App{
+	Name:       "acme",
+	EnvPrefix:  "ACME",
+	SignInHint: "acme login chatgpt",
+	URL:        "https://example.com/acme",
 }
 
 // TestMain sets the app the way the client does, because the rest of this package's
-// tests were written against SHHH_API_KEY and the shhh- keys.
+// tests were written against ACME_API_KEY and the acme- keys.
 func TestMain(m *testing.M) {
-	SetApp(shhhApp)
+	SetApp(acmeApp)
 	os.Exit(m.Run())
 }
 
@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 func withApp(t *testing.T, a App) {
 	t.Helper()
 	SetApp(a)
-	t.Cleanup(func() { SetApp(shhhApp) })
+	t.Cleanup(func() { SetApp(acmeApp) })
 }
 
 type headerRecorder struct{ h http.Header }
@@ -37,29 +37,29 @@ func (r *headerRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
 }
 
-// TestShhhIdentityIsByteIdentical pins every string the backends write for
+// TestAppIdentityIsPinned pins every string the backends write for
 // the caller. The expected values were captured on the commit before the app
 // became a setting, by running the same calls against the code that had them
 // written in, so a change here is a change in what a person's cache, headers
 // or environment see.
-func TestShhhIdentityIsByteIdentical(t *testing.T) {
-	for _, k := range []string{"SHHH_API_KEY", "SHHH_BASE_URL", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"} {
+func TestAppIdentityIsPinned(t *testing.T) {
+	for _, k := range []string{"ACME_API_KEY", "ACME_BASE_URL", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"} {
 		t.Setenv(k, "")
 	}
 	for name, want := range map[string]string{
-		"anthropic":        "SHHH_API_KEY or ANTHROPIC_API_KEY is not set",
-		"gemini":           "SHHH_API_KEY or GEMINI_API_KEY is not set",
-		"openai":           "SHHH_API_KEY or OPENAI_API_KEY is not set",
-		"openai-responses": "SHHH_API_KEY or OPENAI_API_KEY is not set",
-		"openrouter":       "SHHH_API_KEY or OPENROUTER_API_KEY is not set",
+		"anthropic":        "ACME_API_KEY or ANTHROPIC_API_KEY is not set",
+		"gemini":           "ACME_API_KEY or GEMINI_API_KEY is not set",
+		"openai":           "ACME_API_KEY or OPENAI_API_KEY is not set",
+		"openai-responses": "ACME_API_KEY or OPENAI_API_KEY is not set",
+		"openrouter":       "ACME_API_KEY or OPENROUTER_API_KEY is not set",
 	} {
 		if _, err := Resolve(name, ResolveOpts{}); err == nil || err.Error() != want {
 			t.Errorf("Resolve(%s) = %v, want %q", name, err, want)
 		}
 	}
 
-	t.Setenv("SHHH_API_KEY", "envkey")
-	t.Setenv("SHHH_BASE_URL", "http://env.invalid/v1")
+	t.Setenv("ACME_API_KEY", "envkey")
+	t.Setenv("ACME_BASE_URL", "http://env.invalid/v1")
 	c, err := NewOpenAICompat(ResolveOpts{})
 	if err != nil || c.apiKey != "envkey" || c.baseURL != "http://env.invalid/v1" {
 		t.Errorf("compat read %q %q (%v)", c.apiKey, c.baseURL, err)
@@ -74,22 +74,22 @@ func TestShhhIdentityIsByteIdentical(t *testing.T) {
 	if _, err := (&openRouterTransport{base: rec}).RoundTrip(req); err != nil {
 		t.Fatal(err)
 	}
-	if got := rec.h.Get("HTTP-Referer"); got != "https://github.com/rfizzle/shhh" {
+	if got := rec.h.Get("HTTP-Referer"); got != "https://example.com/acme" {
 		t.Errorf("HTTP-Referer = %q", got)
 	}
-	if got := rec.h.Get("X-Title"); got != "shhh" {
+	if got := rec.h.Get("X-Title"); got != "acme" {
 		t.Errorf("X-Title = %q", got)
 	}
 
 	messages := []Message{{Role: RoleSystem, Content: "sys"}, {Role: RoleUser, Content: "hi"}}
 	for _, c := range []struct{ name, got, want string }{
-		{"openrouter session", openRouterSessionID(messages), "shhh-19f1009488c3fa197540aa1346cdf402"},
-		{"openrouter session, no messages", openRouterSessionID(nil), "shhh-827b8604f8e45721866e86a49deb8a95"},
-		{"chat cache key", chatPromptCacheKey("m", json.RawMessage(`[{"role":"system","content":"s"}]`), json.RawMessage(`[]`)), "shhh-5520eb3a07d223c41253f016483d2424934f753c5ed41f9cffdc7c4b84cbd7ef"},
-		{"responses cache key", responseCacheKey("m", "ins", []Tool{{Name: "t", Description: "d", Parameters: json.RawMessage(`{}`)}}), "shhh-6edd4baac2de7dee38778661cb677e8d"},
-		{"sign-in hint", chatGPTKeyEnv(), "shhh providers login chatgpt"},
-		{"signed-out error", ErrChatGPTSignedOut.Error(), "not signed in to ChatGPT; run `shhh providers login chatgpt`"},
-		{"tool group", planToolNamespace(), "shhh"},
+		{"openrouter session", openRouterSessionID(messages), "acme-17c15c4576d9a78cd19891ac5979026d"},
+		{"openrouter session, no messages", openRouterSessionID(nil), "acme-d6324b34db7702f0caaf1eafeac27841"},
+		{"chat cache key", chatPromptCacheKey("m", json.RawMessage(`[{"role":"system","content":"s"}]`), json.RawMessage(`[]`)), "acme-5520eb3a07d223c41253f016483d2424934f753c5ed41f9cffdc7c4b84cbd7ef"},
+		{"responses cache key", responseCacheKey("m", "ins", []Tool{{Name: "t", Description: "d", Parameters: json.RawMessage(`{}`)}}), "acme-6edd4baac2de7dee38778661cb677e8d"},
+		{"sign-in hint", chatGPTKeyEnv(), "acme login chatgpt"},
+		{"signed-out error", ErrChatGPTSignedOut.Error(), "not signed in to ChatGPT; run `acme login chatgpt`"},
+		{"tool group", planToolNamespace(), "acme"},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
@@ -102,16 +102,16 @@ func TestShhhIdentityIsByteIdentical(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const wantPlan = `{"model":"","input":[{"type":"function_call","namespace":"shhh"}],"stream":true,"store":false,"tools":[{"type":"namespace","name":"shhh","description":"The tools this session can call.","tools":[{"type":"","name":"read_file"}]}]}`
+	const wantPlan = `{"model":"","input":[{"type":"function_call","namespace":"acme"}],"stream":true,"store":false,"tools":[{"type":"namespace","name":"acme","description":"The tools this session can call.","tools":[{"type":"","name":"read_file"}]}]}`
 	if string(body) != wantPlan {
 		t.Errorf("plan request = %s, want %s", body, wantPlan)
 	}
-	if got := rename("", "shhh.read_file"); got != "read_file" {
+	if got := rename("", "acme.read_file"); got != "read_file" {
 		t.Errorf("a group-qualified name mapped to %q", got)
 	}
 
 	_, err = Resolve("chatgpt", ResolveOpts{})
-	if !errors.Is(err, ErrChatGPTSignedOut) || err.Error() != "not signed in to ChatGPT; run `shhh providers login chatgpt`" {
+	if !errors.Is(err, ErrChatGPTSignedOut) || err.Error() != "not signed in to ChatGPT; run `acme login chatgpt`" {
 		t.Errorf("Resolve(chatgpt) = %v", err)
 	}
 }
@@ -121,7 +121,7 @@ func TestShhhIdentityIsByteIdentical(t *testing.T) {
 // that names no command; and the signed-out error still matches by identity.
 func TestTheNeutralAppNamesNoApp(t *testing.T) {
 	withApp(t, App{})
-	for _, k := range []string{"LLM_API_KEY", "SHHH_API_KEY", "ANTHROPIC_API_KEY"} {
+	for _, k := range []string{"LLM_API_KEY", "ACME_API_KEY", "ANTHROPIC_API_KEY"} {
 		t.Setenv(k, "")
 	}
 	_, err := Resolve("anthropic", ResolveOpts{})

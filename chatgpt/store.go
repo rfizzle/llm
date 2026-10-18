@@ -149,7 +149,9 @@ func replaceFile(path, text string, mode os.FileMode) error {
 }
 
 // The three steps of replaceFile a test replaces, to fail one part-way or to
-// read the order they ran in.
+// read the order they ran in. They are process-global: a test that swaps one
+// changes every store in the process, so it must not call t.Parallel, nor run
+// beside a test that does.
 var (
 	syncFile   = func(f *os.File) error { return f.Sync() }
 	renameFile = os.Rename

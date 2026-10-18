@@ -49,6 +49,11 @@ var (
 	// tokens have been cleared; the account and the registration are kept.
 	// It is also the plan route's signed-out error to errors.Is, because
 	// what is to be done about it is the same.
+	//
+	// The value itself says only "the ChatGPT sign-in has expired": its
+	// Error() no longer carries the command to run. An Account returns a
+	// copy that does, built from App.SignInHint, so match with errors.Is
+	// and never compare the text.
 	ErrSignInRequired error = signInExpired{}
 	// ErrPlanNotGranted is a sign-in without the scope that lets a request
 	// spend the plan.
@@ -134,8 +139,10 @@ type Options struct {
 	// App is the program this sign-in is for. Its Name is what OpenAI is
 	// told on the first sign-in and what the browser tab and the errors
 	// call the program, and its SignInHint is the command an expired
-	// sign-in tells the person to run. An empty Name is "llm". Nothing in
-	// this package names an app of its own.
+	// sign-in tells the person to run. The zero value is the app already
+	// handed to llm.SetApp (llm.CurrentApp), so an app names itself once;
+	// set it only for an account that must say something different. An
+	// empty Name is "llm". Nothing in this package names an app of its own.
 	App llm.App
 	// Store is where the record, the host ID and the lock live. The app
 	// supplies it: nothing here knows where an app keeps its data.
@@ -195,6 +202,9 @@ const requestTimeout = 30 * time.Second
 func Open(o Options) (*Account, error) {
 	if err := o.Store.ensure(); err != nil {
 		return nil, err
+	}
+	if o.App == (llm.App{}) {
+		o.App = llm.CurrentApp()
 	}
 	a := &Account{
 		store: o.Store, app: o.App, client: o.Client, now: o.Now, onTokens: o.OnTokens,

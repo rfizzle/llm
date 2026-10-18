@@ -40,6 +40,11 @@ func SetApp(a App) {
 	app.Store(&a)
 }
 
+// CurrentApp is the identity SetApp last stored, with the neutral defaults
+// filled in. A package that holds a second copy of the identity, such as
+// chatgpt.Options.App, reads it here, so the app names itself once.
+func CurrentApp() App { return caller() }
+
 // caller is the identity in force, never zero.
 func caller() App {
 	if a := app.Load(); a != nil {
