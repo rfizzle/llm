@@ -6,7 +6,7 @@ change: what the module holds, what it refuses to hold, and the shapes it is
 built from. Where each shape lives in the tree is in `AGENTS.md`; why each
 was chosen, where a reason was given, is in [decisions.md](decisions.md).
 
-## What it holds
+## What it holds, and what it refuses to
 
 What any application that talks to a model needs, and nothing that differs
 between applications:
@@ -26,9 +26,7 @@ between applications:
 - the ChatGPT plan sign-in: OAuth with PKCE, refresh, revocation and a
   file-backed credential store.
 
-## What it refuses to hold
-
-An application's policy stays in the application:
+It refuses to hold an application's policy, which stays in the application:
 
 - **The meter and any budget.** The library prices a request's usage; the
   application decides what to add up and when to stop.

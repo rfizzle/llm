@@ -4,6 +4,7 @@
 // prompt-cache marking and model pricing. It carries no application's policy
 // and names no app: each caller passes in its own name, credentials and
 // logger.
+// See docs/architecture.md#what-it-holds-and-what-it-refuses-to.
 //
 // The backends are packages of their own: llm/anthropic, llm/openai (chat
 // completions), llm/openai/responses (the Responses API and the ChatGPT plan
@@ -25,4 +26,5 @@
 // structured part of a tool result). This package holds the message,
 // tool-call, stream and usage types, the provider registry and the caller's
 // identity, and nothing else.
+// See docs/architecture.md#the-vocabularies-are-packages.
 package llm

@@ -70,6 +70,7 @@ func Register(name string, f Factory) {
 // RegisterBuiltin registers a provider that ships with the library, once. A
 // backend package calls it from its init, the way a database/sql driver
 // registers itself, so the built-ins are the backends the app imported.
+// See docs/architecture.md#backends-resolved-by-name.
 func RegisterBuiltin(name string, f Factory) {
 	if builtin[name] {
 		panic(fmt.Sprintf("provider: built-in %q registered twice", name))

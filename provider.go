@@ -194,6 +194,7 @@ type StreamEvent struct {
 	// drawn. It exists so a surface can tell a live stream that is quiet from
 	// one that has said nothing at all; every other reader counts it as an
 	// event and ignores it.
+	// See docs/architecture.md#failures-retry-and-keep-alive.
 	Keepalive bool
 	// Stop is why the model stopped writing, on the terminal event and
 	// nowhere else. The empty value is a stream that ended without saying —
