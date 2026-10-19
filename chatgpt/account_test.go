@@ -69,7 +69,7 @@ func TestHostID_GeneratedOnceAndKept(t *testing.T) {
 	if after, _ := a.HostID(); after != id {
 		t.Errorf("HostID after Clear = %q, want %q", after, id)
 	}
-	if err := os.WriteFile(filepath.Join(dir, hostIDFile), []byte("not an id\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "host-id"), []byte("not an id\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.HostID(); err == nil {

@@ -15,8 +15,9 @@ type App struct {
 	// EnvPrefix is the caller's environment prefix. "ACME" reads
 	// ACME_API_KEY and ACME_BASE_URL.
 	EnvPrefix string
-	// SignInHint is the command a person runs to sign in to ChatGPT, as it
-	// is typed, without quotes.
+	// SignInHint tells a person how to sign in to ChatGPT. It is shown
+	// verbatim, so it is whatever that person would do: a command as it is
+	// typed, without quotes, or a place in a UI such as "Settings → Accounts".
 	SignInHint string
 	// URL is sent to OpenRouter as HTTP-Referer. Empty sends no referer.
 	URL string

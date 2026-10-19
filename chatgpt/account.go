@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rfizzle/llm/chatgpt/credstore"
+
 	"github.com/rfizzle/llm"
 )
 
@@ -145,8 +147,9 @@ type Options struct {
 	// empty Name is "llm". Nothing in this package names an app of its own.
 	App llm.App
 	// Store is where the record, the host ID and the lock live. The app
-	// supplies it: nothing here knows where an app keeps its data.
-	Store FileStore
+	// supplies it: nothing here knows where an app keeps its data. FileStore
+	// is the one this package provides.
+	Store Store
 	// Client sends every request to the authorization server; nil is a
 	// plain client with a timeout.
 	Client *http.Client
@@ -159,12 +162,19 @@ type Options struct {
 	OnTokens func(access, refresh, id string)
 }
 
+// Store and FileStore are defined in chatgpt/credstore; the aliases keep them
+// under the names an app already writes.
+type (
+	Store     = credstore.Store
+	FileStore = credstore.FileStore
+)
+
 // Account is one ChatGPT sign-in on this host. It is safe for concurrent
 // use, and two Accounts on one directory — in one process or two — refresh
 // one at a time: a refresh token is spent by using it, and a second process
 // presenting the spent one is answered as a replay and signs the person out.
 type Account struct {
-	store    FileStore
+	store    Store
 	app      llm.App
 	client   *http.Client
 	now      func() time.Time
@@ -197,10 +207,13 @@ type Account struct {
 // down.
 const requestTimeout = 30 * time.Second
 
-// Open opens the account directory, creating it owner-only. It reads
+// Open opens the store, which for a FileStore creates the directory owner-only. It reads
 // nothing: a host that never signs in pays for a directory and no more.
 func Open(o Options) (*Account, error) {
-	if err := o.Store.ensure(); err != nil {
+	if o.Store == nil {
+		return nil, errors.New("chatgpt: Options.Store is not set")
+	}
+	if err := o.Store.Ensure(); err != nil {
 		return nil, err
 	}
 	if o.App == (llm.App{}) {
@@ -232,14 +245,11 @@ func Open(o Options) (*Account, error) {
 // HasRecord reports whether the store holds a credential record, creating
 // nothing: a caller that only wants to hide tokens that exist must not leave a
 // directory behind on a host that never signed in.
-func HasRecord(s FileStore) bool { return s.has() }
+func HasRecord(s Store) bool { return s.Has() }
 
-// Dir is the account directory, for a sentence that names where the record
-// is.
-func (a *Account) Dir() string { return a.store.Dir }
-
-// CredentialsPath is the record's path.
-func (a *Account) CredentialsPath() string { return a.store.CredentialsPath() }
+// CredentialsPath is where the record is: the file's path for a FileStore,
+// whatever the store calls its place otherwise.
+func (a *Account) CredentialsPath() string { return a.store.Location() }
 
 // Credential reads the record as it is on disk. No record is the zero
 // Credential and no error. The read takes no lock: the record is only ever
@@ -248,8 +258,8 @@ func (a *Account) Credential() (Credential, error) { return a.read() }
 
 func (a *Account) read() (Credential, error) { return readRecord(a.store) }
 
-func readRecord(store FileStore) (Credential, error) {
-	data, err := store.readCredential()
+func readRecord(store Store) (Credential, error) {
+	data, err := store.LoadRecord()
 	if errors.Is(err, fs.ErrNotExist) {
 		return Credential{}, nil
 	}
@@ -260,7 +270,7 @@ func readRecord(store FileStore) (Credential, error) {
 	if err := json.Unmarshal(data, &c); err != nil {
 		// The decoder's error names a character or a type, never the text
 		// around it, so it cannot carry a token into the message.
-		return Credential{}, fmt.Errorf("%s is not a ChatGPT credential record: %w", store.CredentialsPath(), errMalformed{err})
+		return Credential{}, fmt.Errorf("%s is not a ChatGPT credential record: %w", store.Location(), errMalformed{err})
 	}
 	return c, nil
 }
@@ -291,7 +301,7 @@ func (a *Account) write(c Credential) error {
 	if err != nil {
 		return err
 	}
-	return a.store.writeCredential(append(data, '\n'))
+	return a.store.SaveRecord(append(data, '\n'))
 }
 
 // report tells OnTokens about a set it has not been told about yet.
@@ -307,23 +317,16 @@ func (a *Account) report(c Credential) {
 	a.onTokens(c.AccessToken, c.RefreshToken, c.IDToken)
 }
 
-// withLock runs fn holding the advisory lock on credentials.lock. The lock
-// is a file of its own because the record is replaced by a rename: a lock
-// held on the record would be on the old file the moment the first writer
-// renamed over it, and the second writer would take a lock on the new one.
+// withLock runs fn holding the store's lock, polling for it until lockWait.
 func (a *Account) withLock(ctx context.Context, fn func() error) error {
-	f, err := a.store.openLock()
-	if err != nil {
-		return err
-	}
-	defer f.Close()
 	deadline := time.Now().Add(a.lockWait)
 	for {
-		ok, err := lockFile(f)
+		unlock, ok, err := a.store.TryLock()
 		if err != nil {
 			return err
 		}
 		if ok {
+			defer unlock()
 			break
 		}
 		if time.Now().After(deadline) {
@@ -333,7 +336,6 @@ func (a *Account) withLock(ctx context.Context, fn func() error) error {
 			return err
 		}
 	}
-	defer unlockFile(f)
 	return fn()
 }
 
@@ -356,10 +358,10 @@ func (a *Account) HostID() (string, error) {
 // both locks held, so two processes signing in for the first time agree on
 // one ID.
 func (a *Account) ensureHostID() (string, error) {
-	id, err := a.store.readHostID()
+	id, err := a.store.LoadHostID()
 	if err == nil {
 		if !validHostID(id) {
-			return "", a.store.errHostID()
+			return "", fmt.Errorf("%s: the stored host ID is not one OpenAI documents; delete it to have a new one made", a.store.Location())
 		}
 		return id, nil
 	}
@@ -370,7 +372,7 @@ func (a *Account) ensureHostID() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := a.store.writeHostID(id); err != nil {
+	if err := a.store.SaveHostID(id); err != nil {
 		return "", err
 	}
 	return id, nil
