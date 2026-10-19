@@ -5,8 +5,8 @@
 //   - a Markdown link whose file or heading does not exist;
 //   - a `See docs/<file>.md#<heading>` citation in a Go comment that does not resolve;
 //   - a citation of docs/research/, which is a dated snapshot;
-//   - a path in backticks in AGENTS.md or README.md that does not exist and
-//     is not marked "(planned)";
+//   - a path in backticks in AGENTS.md or README.md that does not exist, is
+//     not git-ignored, and is not marked "(planned)";
 //   - a `make <target>` in a document that the Makefile lacks (skills vendored
 //     through .agents/skills/shared.sum are exempt: their targets are examples);
 //   - a required-Go-version claim in a root file that disagrees with go.mod;
@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -377,10 +378,17 @@ func (c *checker) checkPath(path string, n int, tok string) {
 	candidate := strings.HasSuffix(file, "/") ||
 		(hasSlash && exists(first) && !strings.Contains(first, ".")) ||
 		(strings.HasPrefix(file, ".") && (hasSlash || strings.Count(file, ".") > 1))
-	if !candidate || exists(file) {
+	if !candidate || exists(file) || ignored(file) {
 		return
 	}
 	c.fail(path, n, "path `%s` does not exist (say \"(planned)\" on the line if it is intended)", tok)
+}
+
+// ignored reports whether git ignores the path. A document may describe a
+// runtime directory the build creates (a cache, a local plan folder); that is
+// not a claim about tracked content, and a fresh checkout does not have it.
+func ignored(file string) bool {
+	return exec.Command("git", "check-ignore", "-q", "--", file).Run() == nil
 }
 
 func (c *checker) checkGo(path string) {
