@@ -1,6 +1,7 @@
 .idea
 .cache
-.claude
+.claude/*
+!.claude/skills
 
 # Binary
 /bin

@@ -37,4 +37,4 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Gate
-        run: make test vet lint fmt-check
+        run: make ci

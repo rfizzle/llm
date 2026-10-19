@@ -1,0 +1,8 @@
+# Shared skills vendored from github.com/rfizzle/skills at the commit shown.
+# Edit them there, then `make skills-sync`; `make skills-check` fails on a copy edited here.
+# path source-commit sha256
+.agents/skills/go-conformance-suite ccaf9e4 faced48236f966d90d5534606771bb48e3319e00d84d8b16a28a5bb3f3b47828
+.agents/skills/project-docs ccaf9e4 c57a732ef866e583849a4d21377d1733e45d26b8e7aada4e1b55126be1569f78
+.agents/skills/sound-patterns ccaf9e4 2fba7692540a4427ae41b2938b9443d6e8eb096f00b45619e9299816ab6bae0b
+scripts/skillscheck ccaf9e4 13630c6f8fca7cc62efdcfc5ef2ad97395562fbd78e738cad1606725b4246315
+scripts/docscheck ccaf9e4 eaf0faa47ff4a78420873530e772ea0646235737c43db81eeb2f24b6621e6bd5

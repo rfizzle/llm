@@ -18,8 +18,9 @@ PROJECT_GOFILES=$(shell find . -type f -name '*.go' -not -path "./vendor/*" -not
 # asks git rather than the filesystem.
 TRACKED_GOFILES=$(shell git ls-files '*.go')
 PROJECT_PACKAGES=$(shell go list ./...)
+SKILLS_SOURCE ?= ../skills
 
-.PHONY: all fmt fmt-check vet lint test integration model-data help
+.PHONY: all fmt fmt-check vet lint test integration docs-check skills-sync skills-check ci model-data help
 
 all: help
 
@@ -47,6 +48,19 @@ vet: ## Run go vet over every tier's files
 
 lint: ## Run golangci-lint
 	@$(HERMETIC_ENV) $(GOLANGCI_LINT) run --modules-download-mode=readonly
+
+# The checker's own tests hold a work-item id as a fixture, in both the
+# vendored script and the skill's copy of it; the defaults are kept beside them.
+docs-check: ## Verify docs links and citations resolve, paths and make targets exist, and no work-item id leaks
+	@$(HERMETIC_ENV) $(GOCMD) run ./scripts/docscheck -skip .plan,.cache,node_modules,vendor,bin,dist,scripts/docscheck,.agents/skills/project-docs/scripts
+
+skills-sync: ## Refresh the shared skills from $(SKILLS_SOURCE); add new ones with SKILLS="a b" (local only)
+	@$(SKILLS_SOURCE)/scripts/sync -C . $(SKILLS)
+
+skills-check: ## Fail if a vendored shared skill differs from the copy recorded in .agents/skills/shared.sum
+	@$(HERMETIC_ENV) $(GOCMD) run ./scripts/skillscheck
+
+ci: fmt-check vet lint test docs-check skills-check ## Run every check CI runs
 
 ## Test:
 # Cacheable on purpose: nothing here adds -count=1, and a test must not chdir.
