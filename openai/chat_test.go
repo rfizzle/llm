@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/llmtest"
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -129,7 +131,7 @@ func TestOpenAI_StreamCompletion_Unauthorized(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 401")
 	}
-	if !errors.Is(err, llm.ErrAuth) {
+	if !errors.Is(err, failure.ErrAuth) {
 		t.Errorf("expected ErrAuth, got: %v", err)
 	}
 }
@@ -154,7 +156,7 @@ func TestOpenAI_StreamCompletion_RateLimited(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 429")
 	}
-	if !errors.Is(err, llm.ErrRateLimited) {
+	if !errors.Is(err, failure.ErrRateLimited) {
 		t.Errorf("expected ErrRateLimited, got: %v", err)
 	}
 }
@@ -541,8 +543,8 @@ func TestOpenAI_StreamCompletion_GPT56UsesPromptCacheAndLowVerbosity(t *testing.
 
 func TestToOpenAIMessages_ToolResultStaysAString(t *testing.T) {
 	msgs := ChatMessages([]llm.Message{
-		{Role: llm.RoleTool, Content: "logo.png is an image", ToolCallID: "t1", Attachments: []llm.Attachment{
-			{Kind: llm.AttachmentImage, Name: "logo.png", MediaType: "image/png", Data: []byte{1, 2, 3}},
+		{Role: llm.RoleTool, Content: "logo.png is an image", ToolCallID: "t1", Attachments: []attachment.Attachment{
+			{Kind: attachment.Image, Name: "logo.png", MediaType: "image/png", Data: []byte{1, 2, 3}},
 		}},
 	})
 	if len(msgs[0].MultiContent) != 0 {

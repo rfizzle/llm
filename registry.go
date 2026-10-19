@@ -24,8 +24,8 @@ type ResolveOpts struct {
 	ConfigName    string
 	// CacheTTL is the configured lifetime of the request's fixed head, as
 	// the file spells it. A dialect that caches on its own ignores it; one
-	// that has to be told reads it through CacheTTLOrDefault, so an empty or
-	// unreadable value is the default rather than a refusal (cache.go).
+	// that has to be told reads it through cache.TTLOrDefault, so an empty or
+	// unreadable value is the default rather than a refusal (llm/cache).
 	CacheTTL string
 	// StreamIdleSeconds is how long a turn's stream may go without an event
 	// before the turn fails, as the file spells it: zero for unset, and any

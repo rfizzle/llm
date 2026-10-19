@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/llmtest"
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -23,7 +25,7 @@ func newTestOpenRouterWithCache(baseURL, model, cacheTTL string) *Provider {
 	cfg := openai.DefaultConfig("test-key")
 	cfg.BaseURL = baseURL
 	cfg.HTTPClient = &http.Client{
-		Transport: &openRouterTransport{base: llm.NewCacheMarkTransport(&llmtest.HTTP, cacheTTL)},
+		Transport: &openRouterTransport{base: cache.NewMarkTransport(&llmtest.HTTP, cacheTTL)},
 	}
 	return NewWith(openai.NewClientWithConfig(cfg), model)
 }
@@ -225,7 +227,7 @@ func TestOpenRouter_StreamCompletion_Unauthorized(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 401")
 	}
-	if !errors.Is(err, llm.ErrAuth) {
+	if !errors.Is(err, failure.ErrAuth) {
 		t.Errorf("expected ErrAuth, got: %v", err)
 	}
 }
@@ -250,7 +252,7 @@ func TestOpenRouter_StreamCompletion_RateLimited(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 429")
 	}
-	if !errors.Is(err, llm.ErrRateLimited) {
+	if !errors.Is(err, failure.ErrRateLimited) {
 		t.Errorf("expected ErrRateLimited, got: %v", err)
 	}
 }
@@ -320,7 +322,7 @@ func TestOpenRouter_StreamCompletion_MarksTheCacheForAnAnthropicModel(t *testing
 	})
 
 	got := llmtest.BodyMarks(t, reMarshal(t, body))
-	want := map[int]string{0: string(llm.CacheTTL1h), 2: string(llm.CacheTTL1h), 3: string(llm.CacheTTL1h)}
+	want := map[int]string{0: string(cache.TTL1h), 2: string(cache.TTL1h), 3: string(cache.TTL1h)}
 	if len(got) != len(want) {
 		t.Fatalf("markers = %v, want %v", got, want)
 	}
@@ -365,10 +367,10 @@ func TestOpenRouter_StreamCompletion_HonoursTheConfiguredCacheLifetime(t *testin
 	})
 
 	got := llmtest.BodyMarks(t, reMarshal(t, body))
-	if got[0] != string(llm.CacheTTL5m) {
+	if got[0] != string(cache.TTL5m) {
 		t.Errorf("the head's marker = %q, want the lifetime that was configured", got[0])
 	}
-	if got[1] != string(llm.CacheTTL5m) {
+	if got[1] != string(cache.TTL5m) {
 		t.Errorf("the rolling marker = %q, want the lifetime that was configured", got[1])
 	}
 }

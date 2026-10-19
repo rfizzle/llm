@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/effort"
 	"google.golang.org/genai"
 )
 
@@ -97,15 +99,15 @@ func TestGemini_CustomModel(t *testing.T) {
 }
 
 func TestGeminiThinkingConfig_UsesTheModelNativeControl(t *testing.T) {
-	three := geminiThinkingConfig(llm.EffortMedium, "gemini-3.7-flash")
+	three := geminiThinkingConfig(effort.Medium, "gemini-3.7-flash")
 	if three == nil || three.ThinkingLevel != genai.ThinkingLevelMedium || three.ThinkingBudget != nil {
 		t.Fatalf("Gemini 3 must receive a named level, got %+v", three)
 	}
-	two := geminiThinkingConfig(llm.EffortMedium, "gemini-2.5-flash")
+	two := geminiThinkingConfig(effort.Medium, "gemini-2.5-flash")
 	if two == nil || two.ThinkingLevel != "" || two.ThinkingBudget == nil || *two.ThinkingBudget != 12288 {
 		t.Fatalf("Gemini 2.5 must keep its numeric budget, got %+v", two)
 	}
-	if off := geminiThinkingConfig(llm.EffortOff, "gemini-3.7-flash"); off != nil {
+	if off := geminiThinkingConfig(effort.Off, "gemini-3.7-flash"); off != nil {
 		t.Fatalf("off must leave Gemini's default untouched, got %+v", off)
 	}
 }
@@ -543,9 +545,9 @@ func TestNextGeminiCallID_Unique(t *testing.T) {
 func TestToGeminiContents_ToolResultCarriesAnImage(t *testing.T) {
 	contents, _ := toGeminiContents([]llm.Message{
 		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "t1", Name: "read_file"}}},
-		{Role: llm.RoleTool, Content: "logo.png is an image", ToolCallID: "t1", Attachments: []llm.Attachment{
-			{Kind: llm.AttachmentImage, Name: "logo.png", MediaType: "image/png", Data: []byte{1, 2, 3}},
-			{Kind: llm.AttachmentText, Name: "notes.txt", MediaType: "text/plain", Data: []byte("hi")},
+		{Role: llm.RoleTool, Content: "logo.png is an image", ToolCallID: "t1", Attachments: []attachment.Attachment{
+			{Kind: attachment.Image, Name: "logo.png", MediaType: "image/png", Data: []byte{1, 2, 3}},
+			{Kind: attachment.Text, Name: "notes.txt", MediaType: "text/plain", Data: []byte("hi")},
 		}},
 	})
 	resp := contents[len(contents)-1].Parts[0].FunctionResponse

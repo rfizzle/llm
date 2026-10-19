@@ -14,11 +14,18 @@ It holds what any LLM app needs:
 - the message, tool-call, stream and usage types (`llm.Message`, `llm.Tool`,
   `llm.ToolCall`, `llm.StreamEvent`, `llm.Usage`);
 - the backends, each a package of its own: `llm/anthropic`, `llm/openai`
-  (chat completions, the Responses API and the ChatGPT plan route),
-  `llm/gemini`, `llm/openrouter` and `llm/compat` (any OpenAI-compatible
-  endpoint), resolved by name with `llm.Resolve` once imported (below);
-- failure classification and retry, stream idle and keep-alive, prompt-cache
-  marking, reasoning effort and model listing;
+  (chat completions), `llm/openai/responses` (the Responses API and the
+  ChatGPT plan route), `llm/gemini`, `llm/openrouter` and `llm/compat` (any
+  OpenAI-compatible endpoint), resolved by name with `llm.Resolve` once
+  imported (below);
+- the vocabularies an app reads, each a package of its own: `llm/failure`
+  (failure classification), `llm/flow` (the bounded calls a request can be),
+  `llm/capability` (what a model can be asked, and what a profile declares
+  about it), `llm/effort` (the reasoning level), `llm/attachment`,
+  `llm/cache` (prompt-cache lifetimes and marking), `llm/catalog` (model
+  listing and context windows), `llm/decision` (the Decisions API) and
+  `llm/toolvalue` (the structured part of a tool result);
+- retry, and stream idle and keep-alive;
 - `llm/pricing`, the model price and context table with a snapshot built in;
 - `llm/chatgpt`, the ChatGPT plan sign-in: OAuth with PKCE, refresh, revoke
   and a file-backed credential store.
@@ -46,11 +53,12 @@ effect, in one file:
 
 ```go
 import (
-	_ "github.com/rfizzle/llm/anthropic"  // anthropic
-	_ "github.com/rfizzle/llm/compat"     // openai-compatible
-	_ "github.com/rfizzle/llm/gemini"     // gemini
-	_ "github.com/rfizzle/llm/openai"     // openai, openai-responses, chatgpt
-	_ "github.com/rfizzle/llm/openrouter" // openrouter
+	_ "github.com/rfizzle/llm/anthropic"        // anthropic
+	_ "github.com/rfizzle/llm/compat"           // openai-compatible
+	_ "github.com/rfizzle/llm/gemini"           // gemini
+	_ "github.com/rfizzle/llm/openai"           // openai
+	_ "github.com/rfizzle/llm/openai/responses" // openai-responses, chatgpt
+	_ "github.com/rfizzle/llm/openrouter"       // openrouter
 )
 ```
 
@@ -111,7 +119,7 @@ To answer a call, append the assistant message with its `ToolCalls`, then a
 `RoleTool` message with the result and the call's `ToolCallID`, and stream
 again. `Example_streamAToolCall` runs this against an in-process server
 (`internal/testhttp`), so it needs no network; an app passes its own
-`http.Client` the same way through `openai.NewResponsesWith`.
+`http.Client` the same way through `responses.NewWith`.
 
 ## Price a Usage
 
@@ -145,7 +153,7 @@ if err != nil {
 if _, err := acct.Login(ctx, chatgpt.LoginOptions{Say: os.Stdout}); err != nil {
 	return err
 }
-p, err := llm.Resolve("chatgpt", llm.ResolveOpts{TokenSource: acct}) // with llm/openai imported
+p, err := llm.Resolve("chatgpt", llm.ResolveOpts{TokenSource: acct}) // with llm/openai/responses imported
 ```
 
 `Login` opens a browser and waits on a loopback callback. `Example_signIn` in

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 	"github.com/rfizzle/llm/internal/llmtest"
 	"google.golang.org/genai"
@@ -33,7 +34,7 @@ func TestStream_GeminiReportsTheWholeCallAsOneFragment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &Provider{client: client, model: "gemini-2.5-flash", classify: llm.NewClassifier("gemini", "ACME_API_KEY", "test-key")}
+	g := &Provider{client: client, model: "gemini-2.5-flash", classify: failure.NewClassifier("gemini", "ACME_API_KEY", "test-key")}
 
 	ch, err := g.StreamCompletion(context.Background(), []llm.Message{{Role: llm.RoleUser, Content: "write main.go"}}, llm.CompletionOpts{})
 	if err != nil {
@@ -75,7 +76,7 @@ func TestStream_GeminiCeilingNamesTheEndingAndKeepsWhatArrivedWhole(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &Provider{client: client, model: "gemini-2.5-flash", classify: llm.NewClassifier("gemini", "ACME_API_KEY", "test-key")}
+	g := &Provider{client: client, model: "gemini-2.5-flash", classify: failure.NewClassifier("gemini", "ACME_API_KEY", "test-key")}
 
 	ch, err := g.StreamCompletion(context.Background(), []llm.Message{{Role: llm.RoleUser, Content: "write main.go"}}, llm.CompletionOpts{})
 	if err != nil {
@@ -118,7 +119,7 @@ func TestIdle_GeminiStreamThatGoesQuietFails(t *testing.T) {
 		client:   client,
 		model:    "gemini-2.5-flash",
 		Deadline: idle.After(llmtest.Idle),
-		classify: llm.NewClassifier("gemini", "ACME_API_KEY", "test-key"),
+		classify: failure.NewClassifier("gemini", "ACME_API_KEY", "test-key"),
 	}
 
 	ch, err := g.StreamCompletion(context.Background(), []llm.Message{{Role: llm.RoleUser, Content: "hello"}}, llm.CompletionOpts{})

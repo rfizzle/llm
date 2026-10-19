@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
 	"github.com/rfizzle/llm/internal/cachemarks"
 )
 
@@ -52,7 +52,7 @@ func countMarks(t *testing.T, params anthropic.MessageNewParams) int {
 
 func TestMarkAnthropicCacheMarksTheFixedHead(t *testing.T) {
 	params := paramsWithTurns("be helpful", 1)
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
 	if params.System[0].CacheControl.Type == "" {
 		t.Fatal("the system prompt must carry a marker: it and the tools are the prefix that never changes")
@@ -61,7 +61,7 @@ func TestMarkAnthropicCacheMarksTheFixedHead(t *testing.T) {
 
 func TestMarkAnthropicCacheRollsOverTheLastTurns(t *testing.T) {
 	params := paramsWithTurns("be helpful", 4)
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
 	last := len(params.Messages) - 1
 	want := []int{last - 1, last}
@@ -90,7 +90,7 @@ func TestMarkAnthropicCacheNamesThePreviousRoundAcrossAParallelBatch(t *testing.
 		anthropic.NewAssistantMessage(calls...),
 		anthropic.NewUserMessage(results...),
 	)
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
 	got := markedMessages(params)
 	last := len(params.Messages) - 1
@@ -101,7 +101,7 @@ func TestMarkAnthropicCacheNamesThePreviousRoundAcrossAParallelBatch(t *testing.
 
 func TestMarkAnthropicCacheStaysUnderTheAPILimit(t *testing.T) {
 	params := paramsWithTurns("be helpful", 40)
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
 	if n := countMarks(t, params); n > cachemarks.Max {
 		t.Fatalf("a request may carry at most %d markers, got %d", cachemarks.Max, n)
@@ -116,7 +116,7 @@ func TestMarkAnthropicCacheSkipsABlockThatCannotCarryOne(t *testing.T) {
 		anthropic.NewTextBlock("thinking out loud"),
 		anthropic.NewThinkingBlock("sig", "why"),
 	))
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
 	blocks := params.Messages[len(params.Messages)-1].Content
 	if blocks[0].OfText.CacheControl.Type == "" {
@@ -129,7 +129,7 @@ func TestMarkAnthropicCacheSkipsABlockThatCannotCarryOne(t *testing.T) {
 
 func TestMarkAnthropicCacheOnAnEmptyRequest(t *testing.T) {
 	params := anthropic.MessageNewParams{}
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
 	if n := countMarks(t, params); n != 0 {
 		t.Fatalf("nothing to mark, got %d markers", n)
@@ -142,7 +142,7 @@ func TestMarkAnthropicCacheOnAnEmptyRequest(t *testing.T) {
 func TestMarkAnthropicCacheChangesNothingButTheMarkers(t *testing.T) {
 	before := paramsWithTurns("be helpful", 3)
 	after := paramsWithTurns("be helpful", 3)
-	markAnthropicCache(&after, llm.DefaultCacheTTL)
+	markAnthropicCache(&after, cache.DefaultTTL)
 
 	strip := func(params anthropic.MessageNewParams) string {
 		raw, err := json.Marshal(params)
@@ -168,9 +168,9 @@ func TestMarkAnthropicCacheChangesNothingButTheMarkers(t *testing.T) {
 // after that pause rewrites the whole body instead of extending it.
 func TestMarkAnthropicCacheGivesEveryMarkerOneLifetime(t *testing.T) {
 	params := paramsWithTurns("be helpful", 2)
-	markAnthropicCache(&params, llm.DefaultCacheTTL)
+	markAnthropicCache(&params, cache.DefaultTTL)
 
-	if got := params.System[0].CacheControl.TTL; got != anthropic.CacheControlEphemeralTTL(llm.CacheTTL1h) {
+	if got := params.System[0].CacheControl.TTL; got != anthropic.CacheControlEphemeralTTL(cache.TTL1h) {
 		t.Errorf("the head's lifetime is %q, want an hour by default", got)
 	}
 	for _, i := range markedMessages(params) {
@@ -179,7 +179,7 @@ func TestMarkAnthropicCacheGivesEveryMarkerOneLifetime(t *testing.T) {
 			if cc == nil || cc.Type == "" {
 				continue
 			}
-			if cc.TTL != anthropic.CacheControlEphemeralTTL(llm.CacheTTL1h) {
+			if cc.TTL != anthropic.CacheControlEphemeralTTL(cache.TTL1h) {
 				t.Errorf("message %d's marker is %q, want the head's own lifetime", i, cc.TTL)
 			}
 		}
@@ -188,9 +188,9 @@ func TestMarkAnthropicCacheGivesEveryMarkerOneLifetime(t *testing.T) {
 
 func TestMarkAnthropicCacheFollowsTheConfiguredLifetime(t *testing.T) {
 	params := paramsWithTurns("be helpful", 2)
-	markAnthropicCache(&params, llm.CacheTTL5m)
+	markAnthropicCache(&params, cache.TTL5m)
 
-	if got := params.System[0].CacheControl.TTL; got != anthropic.CacheControlEphemeralTTL(llm.CacheTTL5m) {
+	if got := params.System[0].CacheControl.TTL; got != anthropic.CacheControlEphemeralTTL(cache.TTL5m) {
 		t.Errorf("the head's lifetime is %q, want the one that was chosen", got)
 	}
 	for _, i := range markedMessages(params) {
@@ -199,7 +199,7 @@ func TestMarkAnthropicCacheFollowsTheConfiguredLifetime(t *testing.T) {
 			if cc == nil || cc.Type == "" {
 				continue
 			}
-			if cc.TTL != anthropic.CacheControlEphemeralTTL(llm.CacheTTL5m) {
+			if cc.TTL != anthropic.CacheControlEphemeralTTL(cache.TTL5m) {
 				t.Errorf("message %d's marker is %q, want the one that was chosen", i, cc.TTL)
 			}
 		}
@@ -210,10 +210,10 @@ func TestMarkAnthropicCacheFollowsTheConfiguredLifetime(t *testing.T) {
 // same session pointed at a different address, so the lifetime it chose has
 // to survive the trip.
 func TestNewAnthropicNamedHonoursTheConfiguredLifetime(t *testing.T) {
-	if got := NewNamed(anthropic.NewClient(), "claude-opus-5", "gateway", "5m").cacheTTL; got != llm.CacheTTL5m {
+	if got := NewNamed(anthropic.NewClient(), "claude-opus-5", "gateway", "5m").cacheTTL; got != cache.TTL5m {
 		t.Errorf("the profile's lifetime is %q, want the one the session chose", got)
 	}
-	if got := NewNamed(anthropic.NewClient(), "claude-opus-5", "gateway", "").cacheTTL; got != llm.DefaultCacheTTL {
+	if got := NewNamed(anthropic.NewClient(), "claude-opus-5", "gateway", "").cacheTTL; got != cache.DefaultTTL {
 		t.Errorf("an unset lifetime is %q, want the default", got)
 	}
 }

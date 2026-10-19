@@ -14,6 +14,11 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/catalog"
+	"github.com/rfizzle/llm/effort"
 	"github.com/rfizzle/llm/internal/idle"
 	"github.com/rfizzle/llm/internal/llmtest"
 	"github.com/rfizzle/llm/internal/testhttp"
@@ -372,7 +377,7 @@ func TestAnthropic_ThinkingBudgetOnlyWhenAsked(t *testing.T) {
 	}
 
 	// The current generation takes a named effort under adaptive thinking.
-	events, err = p.StreamCompletion(context.Background(), msgs, llm.CompletionOpts{Effort: llm.EffortXHigh})
+	events, err = p.StreamCompletion(context.Background(), msgs, llm.CompletionOpts{Effort: effort.XHigh})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +396,7 @@ func TestAnthropic_ThinkingBudgetOnlyWhenAsked(t *testing.T) {
 	// A budget-only model takes the ladder instead, and a rung it lacks
 	// becomes the highest it has.
 	legacy := []llm.Message{{Role: llm.RoleUser, Content: "hi"}}
-	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-haiku-4-5", Effort: llm.EffortMax})
+	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-haiku-4-5", Effort: effort.Max})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +414,7 @@ func TestAnthropic_ThinkingBudgetOnlyWhenAsked(t *testing.T) {
 
 	// A capped output leaves the answer room: the budget clamps to the cap
 	// less the answer floor rather than swallowing the whole ceiling.
-	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-haiku-4-5", Effort: llm.EffortHigh, MaxTokens: 8192})
+	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-haiku-4-5", Effort: effort.High, MaxTokens: 8192})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -423,7 +428,7 @@ func TestAnthropic_ThinkingBudgetOnlyWhenAsked(t *testing.T) {
 	// thinking at all. Without the guard the subtraction goes negative, the
 	// budget reads that as "no ceiling", and a budget larger than max_tokens
 	// goes out — which the Messages API refuses outright.
-	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-haiku-4-5", Effort: llm.EffortLow, MaxTokens: 2048})
+	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-haiku-4-5", Effort: effort.Low, MaxTokens: 2048})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,7 +438,7 @@ func TestAnthropic_ThinkingBudgetOnlyWhenAsked(t *testing.T) {
 	}
 
 	// A model that has no thinking is sent none, whatever was asked.
-	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-3-5-sonnet-latest", Effort: llm.EffortHigh})
+	events, err = p.StreamCompletion(context.Background(), legacy, llm.CompletionOpts{Model: "claude-3-5-sonnet-latest", Effort: effort.High})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +469,7 @@ func TestAnthropic_ThinkingBlocksSurviveIntoTheNextRequest(t *testing.T) {
 
 	p := newTestAnthropic(llm.ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL})
 	events, err := p.StreamCompletion(context.Background(),
-		[]llm.Message{{Role: llm.RoleUser, Content: "read a"}}, llm.CompletionOpts{Effort: llm.EffortMedium})
+		[]llm.Message{{Role: llm.RoleUser, Content: "read a"}}, llm.CompletionOpts{Effort: effort.Medium})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -585,9 +590,9 @@ func TestAnthropic_CacheLifetimeOnTheRequest(t *testing.T) {
 	defer srv.Close()
 
 	for _, tc := range []struct{ configured, want string }{
-		{configured: "", want: string(llm.DefaultCacheTTL)},
-		{configured: "5m", want: string(llm.CacheTTL5m)},
-		{configured: "a fortnight", want: string(llm.DefaultCacheTTL)},
+		{configured: "", want: string(cache.DefaultTTL)},
+		{configured: "5m", want: string(cache.TTL5m)},
+		{configured: "a fortnight", want: string(cache.DefaultTTL)},
 	} {
 		p := newTestAnthropic(llm.ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL, CacheTTL: tc.configured})
 		events, err := p.StreamCompletion(context.Background(), []llm.Message{
@@ -615,9 +620,9 @@ func TestToAnthropicMessages_ToolResultCarriesAnImage(t *testing.T) {
 	_, msgs := toAnthropicMessages([]llm.Message{
 		{Role: llm.RoleUser, Content: "read the logo"},
 		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{ID: "t1", Name: "read_file", Arguments: `{"path":"logo.png"}`}}},
-		{Role: llm.RoleTool, Content: "logo.png is an image", ToolCallID: "t1", Attachments: []llm.Attachment{
-			{Kind: llm.AttachmentImage, Name: "logo.png", MediaType: "image/png", Data: []byte{1, 2, 3}},
-			{Kind: llm.AttachmentText, Name: "notes.txt", MediaType: "text/plain", Data: []byte("hi")},
+		{Role: llm.RoleTool, Content: "logo.png is an image", ToolCallID: "t1", Attachments: []attachment.Attachment{
+			{Kind: attachment.Image, Name: "logo.png", MediaType: "image/png", Data: []byte{1, 2, 3}},
+			{Kind: attachment.Text, Name: "notes.txt", MediaType: "text/plain", Data: []byte("hi")},
 		}},
 	})
 	result := msgs[len(msgs)-1].Content[0].OfToolResult
@@ -670,7 +675,7 @@ func TestAnthropic_SchemaRidesTheOutputConfigBesideTheEffort(t *testing.T) {
 	p := newTestAnthropic(llm.ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL})
 	msgs := []llm.Message{{Role: llm.RoleUser, Content: "hi"}}
 	opts := llm.CompletionOpts{
-		Effort:         llm.EffortLow,
+		Effort:         effort.Low,
 		Tools:          []llm.Tool{{Name: "decide", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}},
 		ToolChoice:     llm.ToolChoiceAuto,
 		ResponseSchema: &llm.ResponseSchema{Name: "verdict", Schema: json.RawMessage(`{"type":"object","additionalProperties":false}`)},
@@ -715,10 +720,10 @@ func TestAnthropic_SchemaRidesTheOutputConfigBesideTheEffort(t *testing.T) {
 // offers, with tool_choice auto, and no format; the effort stays in
 // output_config.
 func TestAnthropic_NoSchemaSendsTheToolAndNoOutputFormat(t *testing.T) {
-	llm.SetCapabilityLookup(func(model string) (llm.Capabilities, bool) {
-		return llm.Capabilities{Reasoning: true, Adaptive: true, NoSchema: true}, model == "claude-sonnet-5-5"
+	capability.SetLookup(func(model string) (capability.Capabilities, bool) {
+		return capability.Capabilities{Reasoning: true, Adaptive: true, NoSchema: true}, model == "claude-sonnet-5-5"
 	})
-	defer llm.SetCapabilityLookup(nil)
+	defer capability.SetLookup(nil)
 
 	var body map[string]any
 	srv := llmtest.HTTP.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -734,7 +739,7 @@ func TestAnthropic_NoSchemaSendsTheToolAndNoOutputFormat(t *testing.T) {
 	p := newTestAnthropic(llm.ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL})
 	events, err := p.StreamCompletion(context.Background(), []llm.Message{{Role: llm.RoleUser, Content: "hi"}}, llm.CompletionOpts{
 		Model:          "claude-sonnet-5-5",
-		Effort:         llm.EffortLow,
+		Effort:         effort.Low,
 		Tools:          []llm.Tool{{Name: "permission_decision", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}},
 		ToolChoice:     llm.ToolChoiceAuto,
 		ResponseSchema: &llm.ResponseSchema{Name: "verdict", Schema: json.RawMessage(`{"type":"object","additionalProperties":false}`)},
@@ -926,11 +931,11 @@ func TestAnthropic_UsageSplitsTheLeaseConfirmed(t *testing.T) {
 		{"an hour honoured",
 			`"usage":{"input_tokens":12,"output_tokens":1,"cache_read_input_tokens":900,"cache_creation_input_tokens":88,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":88}}`,
 			llm.Usage{PromptTokens: 1000, CompletionTokens: 5, CachedTokens: 900, CacheCreationTokens: 88, CacheCreation1h: 88,
-				Reports: llm.FieldCacheRead | llm.FieldCacheCreation | llm.FieldCacheLease}},
+				Reports: cache.FieldRead | cache.FieldCreation | cache.FieldLease}},
 		{"an hour written as five minutes",
 			`"usage":{"input_tokens":12,"output_tokens":1,"cache_read_input_tokens":0,"cache_creation_input_tokens":988,"cache_creation":{"ephemeral_5m_input_tokens":988,"ephemeral_1h_input_tokens":0}}`,
 			llm.Usage{PromptTokens: 1000, CompletionTokens: 5, CacheCreationTokens: 988, CacheCreation5m: 988,
-				Reports: llm.FieldCacheRead | llm.FieldCacheCreation | llm.FieldCacheLease}},
+				Reports: cache.FieldRead | cache.FieldCreation | cache.FieldLease}},
 		{"a gateway that strips the fields",
 			`"usage":{"input_tokens":1000,"output_tokens":1}`,
 			llm.Usage{PromptTokens: 1000, CompletionTokens: 5}},
@@ -964,7 +969,7 @@ func TestAnthropic_UsageSplitsTheLeaseConfirmed(t *testing.T) {
 func TestAnthropicIsNotAModelLister(t *testing.T) {
 	// The Messages API has no models endpoint; the curated catalog covers it.
 	var p llm.Provider = &Provider{}
-	if _, ok := p.(llm.ModelLister); ok {
+	if _, ok := p.(catalog.Lister); ok {
 		t.Fatal("anthropic should not claim live model discovery")
 	}
 }

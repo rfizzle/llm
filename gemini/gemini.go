@@ -14,6 +14,12 @@ import (
 	"time"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/catalog"
+	llmeffort "github.com/rfizzle/llm/effort"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 	"google.golang.org/genai"
 )
@@ -53,9 +59,9 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 	return &Provider{
 		client:   client,
 		model:    model,
-		cache:    newGeminiContextCache(cacheTTLDuration(llm.CacheTTLOrDefault(opts.CacheTTL)), client.Caches.Create),
+		cache:    newGeminiContextCache(cacheTTLDuration(cache.TTLOrDefault(opts.CacheTTL)), client.Caches.Create),
 		Deadline: idle.Of(opts.StreamIdleSeconds),
-		classify: llm.NewClassifier("gemini", llm.CurrentApp().KeyVars("GEMINI_API_KEY"), key),
+		classify: failure.NewClassifier("gemini", llm.CurrentApp().KeyVars("GEMINI_API_KEY"), key),
 	}, nil
 }
 
@@ -71,7 +77,7 @@ func geminiUsage(u *genai.GenerateContentResponseUsageMetadata) *llm.Usage {
 		CachedTokens:     int(u.CachedContentTokenCount),
 	}
 	if usage.CachedTokens > 0 {
-		usage.Reports = llm.FieldCachedContent
+		usage.Reports = cache.FieldCachedContent
 	}
 	return usage
 }
@@ -239,8 +245,8 @@ func newGeminiContextCache(ttl time.Duration, create geminiCacheCreate) *geminiC
 	}
 }
 
-func cacheTTLDuration(ttl llm.CacheTTL) time.Duration {
-	if ttl == llm.CacheTTL5m {
+func cacheTTLDuration(ttl cache.TTL) time.Duration {
+	if ttl == cache.TTL5m {
 		return 5 * time.Minute
 	}
 	return time.Hour
@@ -303,17 +309,17 @@ func clearGeminiCacheHead(config *genai.GenerateContentConfig) {
 // takes a named level; carrying 2.5's numeric budget into it can end a turn
 // without an answer. Off remains absent because models that always think
 // reject a zero budget and must keep their own default.
-func geminiThinkingConfig(effort llm.Effort, model string) *genai.ThinkingConfig {
-	effort = effort.Fit(llm.CapabilitiesFor(model))
+func geminiThinkingConfig(effort llmeffort.Level, model string) *genai.ThinkingConfig {
+	effort = effort.Fit(capability.For(model))
 	if !effort.On() {
 		return nil
 	}
 	if isGemini3(model) {
 		level := genai.ThinkingLevelHigh
 		switch effort {
-		case llm.EffortLow:
+		case llmeffort.Low:
 			level = genai.ThinkingLevelLow
-		case llm.EffortMedium:
+		case llmeffort.Medium:
 			level = genai.ThinkingLevelMedium
 		}
 		return &genai.ThinkingConfig{ThinkingLevel: level}
@@ -523,10 +529,10 @@ func matchGeminiCall(calls []llm.ToolCall, id string, answered int) (int, bool) 
 
 // geminiResponseParts carries the images on a tool result as inline media on
 // the function response.
-func geminiResponseParts(atts []llm.Attachment) []*genai.FunctionResponsePart {
+func geminiResponseParts(atts []attachment.Attachment) []*genai.FunctionResponsePart {
 	var parts []*genai.FunctionResponsePart
 	for _, a := range atts {
-		if a.Kind != llm.AttachmentImage {
+		if a.Kind != attachment.Image {
 			continue
 		}
 		parts = append(parts, &genai.FunctionResponsePart{
@@ -540,16 +546,16 @@ func geminiResponseParts(atts []llm.Attachment) []*genai.FunctionResponsePart {
 // Gemini takes images, PDFs and recordings as blobs, all three in the same
 // part; text attachments stay text, and so does a recording in a format the
 // model's list does not name. Each is led by its label as a text part.
-func geminiAttachmentParts(atts []llm.Attachment) []*genai.Part {
+func geminiAttachmentParts(atts []attachment.Attachment) []*genai.Part {
 	var parts []*genai.Part
 	for _, a := range atts {
 		parts = append(parts, &genai.Part{Text: a.Label()})
 		switch a.Kind {
-		case llm.AttachmentImage, llm.AttachmentDocument:
+		case attachment.Image, attachment.Document:
 			parts = append(parts, &genai.Part{
 				InlineData: &genai.Blob{Data: a.Data, MIMEType: a.MediaType},
 			})
-		case llm.AttachmentAudio:
+		case attachment.Audio:
 			if mimeType, ok := geminiAudioMIME(a.MediaType); ok {
 				parts = append(parts, &genai.Part{
 					InlineData: &genai.Blob{Data: a.Data, MIMEType: mimeType},
@@ -657,11 +663,11 @@ func init() {
 		Model:      defaultGeminiModel,
 		CheapModel: cheapGeminiModel,
 	})
-	llm.RegisterModels("gemini", []string{
+	catalog.Register("gemini", []string{
 		"gemini-3.7-flash",
 		"gemini-3.1-pro-preview",
 		"gemini-2.5-pro",
 		"gemini-2.5-flash",
 	})
-	llm.RegisterErrorShape(errorShape)
+	failure.RegisterErrorShape(errorShape)
 }

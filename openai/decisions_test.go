@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/decision"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/llmtest"
 )
 
@@ -37,13 +38,13 @@ func decisionsServer(t *testing.T, reply string) (*Chat, *http.Request, *[]byte)
 // that says so, and decisions.go is the one place it is spelled.
 func TestDecider_RequestShape(t *testing.T) {
 	o, got, body := decisionsServer(t, `{"answers":[{"type":"predicate","name":"may_run","probability":0.75}]}`)
-	var _ llm.Decider = o
+	var _ decision.Decider = o
 
-	res, err := o.Decide(context.Background(), llm.DecisionRequest{
+	res, err := o.Decide(context.Background(), decision.Request{
 		Model: "gpt-6-luna",
 		Input: "UNTRUSTED EVIDENCE:\n{}",
-		Questions: []llm.DecisionQuestion{{
-			Type: llm.QuestionPredicate, Name: "may_run", Instructions: "The call may run.",
+		Questions: []decision.Question{{
+			Type: decision.QuestionPredicate, Name: "may_run", Instructions: "The call may run.",
 		}},
 	})
 	if err != nil {
@@ -61,7 +62,7 @@ func TestDecider_RequestShape(t *testing.T) {
 	}
 
 	a, ok := res.Answer("may_run")
-	if !ok || a.Type != llm.AnswerPredicate || a.Probability != 0.75 {
+	if !ok || a.Type != decision.AnswerPredicate || a.Probability != 0.75 {
 		t.Fatalf("answer = %+v (found %v)", a, ok)
 	}
 	// The guide documents no usage block, so a response without one is
@@ -74,8 +75,8 @@ func TestDecider_RequestShape(t *testing.T) {
 // A usage block, where a response carries one, is the figure billed.
 func TestDecider_ReportedUsageIsTheFigureBilled(t *testing.T) {
 	o, _, _ := decisionsServer(t, `{"answers":[{"type":"predicate","name":"may_run","probability":1}],"usage":{"input_tokens":321}}`)
-	res, err := o.Decide(context.Background(), llm.DecisionRequest{Model: "gpt-6-luna", Input: "x",
-		Questions: []llm.DecisionQuestion{{Type: llm.QuestionPredicate, Name: "may_run", Instructions: "p"}}})
+	res, err := o.Decide(context.Background(), decision.Request{Model: "gpt-6-luna", Input: "x",
+		Questions: []decision.Question{{Type: decision.QuestionPredicate, Name: "may_run", Instructions: "p"}}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,14 +90,14 @@ func TestDecider_ReportedUsageIsTheFigureBilled(t *testing.T) {
 // probability at all is a failed request rather than an answer.
 func TestDecider_RefusalIsNotAProbability(t *testing.T) {
 	o, _, _ := decisionsServer(t, `{"answers":[{"type":"refusal","name":"may_run"}]}`)
-	req := llm.DecisionRequest{Model: "gpt-6-luna", Input: "x",
-		Questions: []llm.DecisionQuestion{{Type: llm.QuestionPredicate, Name: "may_run", Instructions: "p"}}}
+	req := decision.Request{Model: "gpt-6-luna", Input: "x",
+		Questions: []decision.Question{{Type: decision.QuestionPredicate, Name: "may_run", Instructions: "p"}}}
 	res, err := o.Decide(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	a, ok := res.Answer("may_run")
-	if !ok || a.Type != llm.AnswerRefusal || a.Probability != 0 {
+	if !ok || a.Type != decision.AnswerRefusal || a.Probability != 0 {
 		t.Fatalf("answer = %+v, want a refusal with no probability", a)
 	}
 
@@ -120,8 +121,8 @@ func TestDecider_ARefusedRequestIsAClassifiedFailure(t *testing.T) {
 	}))
 	defer srv.Close()
 	_, err := PostDecisions(context.Background(), llmtest.HTTP.Client(), srv.URL, "k", "gateway",
-		llm.DecisionRequest{Model: "m", Input: "x"})
-	f, ok := llm.AsFailure(err)
+		decision.Request{Model: "m", Input: "x"})
+	f, ok := failure.As(err)
 	if !ok || f.Status != http.StatusNotFound || f.Provider != "gateway" {
 		t.Fatalf("err = %v (%+v)", err, f)
 	}
@@ -132,16 +133,16 @@ func TestDecider_ARefusedRequestIsAClassifiedFailure(t *testing.T) {
 // else — not its siblings, not the families the capability floor describes.
 func TestCapabilities_DecisionsAreDeclaredNotGuessed(t *testing.T) {
 	for _, m := range []string{"gpt-6-luna", "gpt-6-luna-2026-10-01", "openai/gpt-6-luna"} {
-		if !decisionsOnFloor(m) {
+		if !DecisionsOnFloor(m) {
 			t.Errorf("%s: the floor should offer it", m)
 		}
 	}
 	for _, m := range []string{"gpt-6-terra", "gpt-5.6-luna", "gpt-4o", "claude-opus-5", ""} {
-		if decisionsOnFloor(m) {
+		if DecisionsOnFloor(m) {
 			t.Errorf("%s: offered by a floor that does not name it", m)
 		}
 	}
-	if !llm.DecisionsDeclared("openai", "gpt-6-luna") || !llm.DecisionsDeclared("openai-responses", "gpt-6-luna") {
+	if !decision.Declared("openai", "gpt-6-luna") || !decision.Declared("openai-responses", "gpt-6-luna") {
 		t.Error("the native providers should declare the floor")
 	}
 	o := &Chat{}

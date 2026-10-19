@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
 	"github.com/rfizzle/llm/internal/llmtest"
 )
 
@@ -12,7 +13,7 @@ func TestToGeminiContents_InlineBlobLeads(t *testing.T) {
 	contents, _ := toGeminiContents([]llm.Message{{
 		Role:        llm.RoleUser,
 		Content:     "look",
-		Attachments: []llm.Attachment{llmtest.PNG},
+		Attachments: []attachment.Attachment{llmtest.PNG},
 	}})
 	if len(contents) != 1 || len(contents[0].Parts) != 3 {
 		t.Fatalf("got %#v", contents)
@@ -30,7 +31,7 @@ func TestToGeminiContents_AudioRidesAsAnInlineBlob(t *testing.T) {
 	contents, _ := toGeminiContents([]llm.Message{{
 		Role:        llm.RoleUser,
 		Content:     "what is said here?",
-		Attachments: []llm.Attachment{llmtest.MP3, llmtest.OGG},
+		Attachments: []attachment.Attachment{llmtest.MP3, llmtest.OGG},
 	}})
 	if len(contents) != 1 || len(contents[0].Parts) != 5 {
 		t.Fatalf("got %#v", contents)
@@ -50,8 +51,8 @@ func TestToGeminiContents_AudioRidesAsAnInlineBlob(t *testing.T) {
 }
 
 func TestToGeminiContents_AFormatItsListOmitsGoesAsText(t *testing.T) {
-	flac := llm.Attachment{Kind: llm.AttachmentAudio, Name: "take.flac", MediaType: "audio/flac", Data: []byte("fLaC")}
-	contents, _ := toGeminiContents([]llm.Message{{Role: llm.RoleUser, Attachments: []llm.Attachment{flac}}})
+	flac := attachment.Attachment{Kind: attachment.Audio, Name: "take.flac", MediaType: "audio/flac", Data: []byte("fLaC")}
+	contents, _ := toGeminiContents([]llm.Message{{Role: llm.RoleUser, Attachments: []attachment.Attachment{flac}}})
 	part := contents[0].Parts[1]
 	if part.InlineData != nil {
 		t.Fatalf("a format the list omits should not go inline: %#v", part.InlineData)
@@ -65,7 +66,7 @@ func TestToGeminiContents_LabelLeadsEachAttachment(t *testing.T) {
 	for _, tc := range llmtest.LabelledCases(t) {
 		t.Run(tc.Name, func(t *testing.T) {
 			contents, _ := toGeminiContents([]llm.Message{{
-				Role: llm.RoleUser, Content: tc.Att.Handle + " shows it", Attachments: []llm.Attachment{tc.Att},
+				Role: llm.RoleUser, Content: tc.Att.Handle + " shows it", Attachments: []attachment.Attachment{tc.Att},
 			}})
 			parts := contents[0].Parts
 			if len(parts) != 3 {
@@ -74,7 +75,7 @@ func TestToGeminiContents_LabelLeadsEachAttachment(t *testing.T) {
 			if parts[0].Text != tc.Label || parts[0].InlineData != nil {
 				t.Fatalf("first part = %#v, want the label %q", parts[0], tc.Label)
 			}
-			if tc.Att.Kind == llm.AttachmentText {
+			if tc.Att.Kind == attachment.Text {
 				if !strings.Contains(parts[1].Text, `<attachment name="`+tc.Att.Name+`"`) {
 					t.Fatalf("the text attachment should keep its wrapper: %q", parts[1].Text)
 				}

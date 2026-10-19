@@ -3,6 +3,12 @@ package llm
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/effort"
+	"github.com/rfizzle/llm/flow"
 )
 
 type Role string
@@ -21,8 +27,8 @@ type Message struct {
 	ToolCallID string
 	// Attachments are the non-conversational parts the message carries —
 	// pasted images, files off the clipboard. Each provider's
-	// converter decides how to put them on the wire; see attachment.go.
-	Attachments []Attachment
+	// converter decides how to put them on the wire; see llm/attachment.
+	Attachments []attachment.Attachment
 	// Reasoning is the thinking the model did before this message, kept in
 	// the provider's own form (reasoning.go). Only the assistant turn
 	// that requested tools needs it, and only the providers that require it
@@ -67,7 +73,7 @@ type Message struct {
 	// answer the moment the session was reopened.
 	Checkpoint bool
 	// Value is what a tool result carries beside its text, as the tool
-	// that wrote it encoded it (value.go): the quality gate's reading of
+	// that wrote it encoded it (llm/toolvalue): the quality gate's reading of
 	// its own verdict. Nothing on the wire reads it — the model is told the
 	// text and only the text — and what reads it is every surface that
 	// draws a row for the call, so a reopened session and a child's
@@ -148,63 +154,7 @@ type Usage struct {
 	// values. A gateway that strips them answers with none, and that is a
 	// different fact from a cache that missed: one reports a zero, the other
 	// reports nothing at all.
-	Reports CacheFields
-}
-
-// CacheFields is a set of the cache fields a response can carry, named as
-// the wire names them. It is a set of bits rather than a list of strings so
-// that a Usage stays a value two readings can be compared by.
-type CacheFields uint8
-
-const (
-	// FieldCacheRead and FieldCacheCreation are the Messages API's read and
-	// write totals, which a gateway forwarding it may also send.
-	FieldCacheRead CacheFields = 1 << iota
-	FieldCacheCreation
-	// FieldCacheLease is the Messages API's per-lifetime breakdown of the
-	// write.
-	FieldCacheLease
-	// FieldCachedTokens is the OpenAI dialects' read, under the prompt's or
-	// the input's details.
-	FieldCachedTokens
-	// FieldCachedContent is Gemini's read.
-	FieldCachedContent
-)
-
-var cacheFieldNames = []struct {
-	field CacheFields
-	name  string
-}{
-	{FieldCacheRead, "cache_read_input_tokens"},
-	{FieldCacheCreation, "cache_creation_input_tokens"},
-	{FieldCacheLease, "cache_creation"},
-	{FieldCachedTokens, "cached_tokens"},
-	{FieldCachedContent, "cachedContentTokenCount"},
-}
-
-// Names is the set as the wire spells it, in a fixed order.
-func (f CacheFields) Names() []string {
-	var out []string
-	for _, n := range cacheFieldNames {
-		if f&n.field != 0 {
-			out = append(out, n.name)
-		}
-	}
-	return out
-}
-
-// CacheFieldsNamed is the set the names spell; a name it does not know is
-// passed over.
-func CacheFieldsNamed(names []string) CacheFields {
-	var f CacheFields
-	for _, name := range names {
-		for _, n := range cacheFieldNames {
-			if n.name == name {
-				f |= n.field
-			}
-		}
-	}
-	return f
+	Reports cache.Fields
 }
 
 type StreamEvent struct {
@@ -341,8 +291,8 @@ type CompletionOpts struct {
 	// them is one some dialects forward and others quietly drop.
 	ToolChoice string
 	// Effort is the reasoning level asked of the model (
-	// reasoning.go). EffortOff — the zero value — sends nothing.
-	Effort Effort
+	// llm/effort). effort.Off — the zero value — sends nothing.
+	Effort effort.Level
 	// ResponseSchema is the shape the answer is asked to take, for a caller
 	// that wants an object rather than prose. It is an offer and not an
 	// instruction: a model that cannot be told to match a schema is sent
@@ -355,14 +305,14 @@ type CompletionOpts struct {
 	// it and never by a wrapper, so a profile's declaration scoped to that
 	// flow narrows this request and no other. Empty is the main agent and
 	// its children, where nothing may be scoped.
-	Flow Flow
+	Flow flow.Flow
 }
 
 // Capabilities is what the named model can be asked on this request: the
 // model-wide answer, narrowed by whatever is declared for the request's
 // flow.
-func (o CompletionOpts) Capabilities(model string) Capabilities {
-	return capabilitiesOn(model, o.Flow)
+func (o CompletionOpts) Capabilities(model string) capability.Capabilities {
+	return capability.On(model, o.Flow)
 }
 
 // ResponseSchema is a JSON Schema the answer is validated against before it

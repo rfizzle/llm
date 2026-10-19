@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/rfizzle/llm"
 	"github.com/rfizzle/llm/internal/cachemarks"
@@ -62,7 +63,7 @@ func markOpenAIChatPromptCacheBody(body []byte) []byte {
 		return body
 	}
 	var model string
-	if err := json.Unmarshal(envelope["model"], &model); err != nil || !responsesExplicitCache(model) {
+	if err := json.Unmarshal(envelope["model"], &model); err != nil || !ResponsesExplicitCache(model) {
 		return body
 	}
 	if _, exists := envelope["prompt_cache_key"]; exists {
@@ -99,4 +100,16 @@ func chatPromptCacheKey(model string, messages, tools json.RawMessage) string {
 	}
 	_, _ = h.Write(tools)
 	return llm.CurrentApp().Name + "-" + fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// ResponsesExplicitCache is deliberately narrower than the generic GPT-5
+// family. These request fields are a GPT-5.6 Responses feature and forwarding
+// them to an older model turns an optimization into a rejected request.
+// The Responses package asks it of the same models.
+func ResponsesExplicitCache(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if i := strings.LastIndex(model, "/"); i >= 0 {
+		model = model[i+1:]
+	}
+	return strings.HasPrefix(model, "gpt-5.6")
 }

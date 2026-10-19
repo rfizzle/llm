@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
 	"github.com/rfizzle/llm/internal/idle"
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -263,10 +264,10 @@ func openAIChatUsage(u *openai.Usage, raw []byte) *llm.Usage {
 		return usage
 	}
 	if d := extra.Usage.PromptTokensDetails; d != nil && d.CachedTokens != nil {
-		usage.Reports |= llm.FieldCachedTokens
+		usage.Reports |= cache.FieldCachedTokens
 	}
 	if w := extra.Usage.CacheCreationInputTokens; w != nil {
-		usage.Reports |= llm.FieldCacheCreation
+		usage.Reports |= cache.FieldCreation
 		usage.CacheCreationTokens = max(*w, 0)
 		// Usage promises the write is inside the prompt count. A gateway
 		// that counted it beside the prompt instead would otherwise leave

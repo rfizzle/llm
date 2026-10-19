@@ -20,6 +20,10 @@ import (
 	"time"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/failure"
+	llmflow "github.com/rfizzle/llm/flow"
 	"github.com/rfizzle/llm/internal/testhttp"
 )
 
@@ -238,12 +242,12 @@ func AssertIdleFailure(t *testing.T, err error) {
 	if !errors.Is(err, llm.ErrStreamIdle) {
 		t.Errorf("the failure should name the deadline, got %v", err)
 	}
-	f, ok := llm.AsFailure(err)
+	f, ok := failure.As(err)
 	if !ok {
 		t.Fatalf("the failure should be classified, got %T", err)
 	}
-	if f.Class != llm.ClassNetwork {
-		t.Errorf("class = %q, want %q", f.Class, llm.ClassNetwork)
+	if f.Class != failure.ClassNetwork {
+		t.Errorf("class = %q, want %q", f.Class, failure.ClassNetwork)
 	}
 	if !f.Recoverable() {
 		t.Error("a stream that went quiet is a stall the session can come back from")
@@ -264,7 +268,7 @@ func PictureOf(t *testing.T, w, h int) []byte {
 // request must lead its part with.
 type Labelled struct {
 	Name  string
-	Att   llm.Attachment
+	Att   attachment.Attachment
 	Label string
 }
 
@@ -273,19 +277,19 @@ func LabelledCases(t *testing.T) []Labelled {
 	return []Labelled{
 		{
 			Name: "a picture is counted in pixels",
-			Att: llm.Attachment{Kind: llm.AttachmentImage, Name: "clipboard.png", Handle: "Image#1",
+			Att: attachment.Attachment{Kind: attachment.Image, Name: "clipboard.png", Handle: "Image#1",
 				MediaType: "image/png", Data: PictureOf(t, 14, 9)},
 			Label: "Image#1 (clipboard.png, 14×9):",
 		},
 		{
 			Name: "a paste is counted in lines",
-			Att: llm.Attachment{Kind: llm.AttachmentText, Name: "paste-1.txt", Handle: "Paste#1",
+			Att: attachment.Attachment{Kind: attachment.Text, Name: "paste-1.txt", Handle: "Paste#1",
 				MediaType: "text/plain", Data: []byte(strings.Repeat("round 26 reached\n", 214))},
 			Label: "Paste#1 (paste-1.txt, 214 lines):",
 		},
 		{
 			Name: "a document is counted in bytes",
-			Att: llm.Attachment{Kind: llm.AttachmentDocument, Name: "spec.pdf", Handle: "File#1",
+			Att: attachment.Attachment{Kind: attachment.Document, Name: "spec.pdf", Handle: "File#1",
 				MediaType: "application/pdf", Data: bytes.Repeat([]byte("%PDF"), 1024)},
 			Label: "File#1 (spec.pdf, 4 KB):",
 		},
@@ -294,14 +298,14 @@ func LabelledCases(t *testing.T) []Labelled {
 
 // The fixtures every dialect's attachment tests are fed.
 var (
-	PNG = llm.Attachment{
-		Kind:      llm.AttachmentImage,
+	PNG = attachment.Attachment{
+		Kind:      attachment.Image,
 		Name:      "shot.png",
 		MediaType: "image/png",
 		Data:      []byte{0x89, 'P', 'N', 'G'},
 	}
-	Notes = llm.Attachment{
-		Kind:      llm.AttachmentText,
+	Notes = attachment.Attachment{
+		Kind:      attachment.Text,
 		Name:      "notes.md",
 		MediaType: "text/markdown",
 		Data:      []byte("# heading\n"),
@@ -317,8 +321,8 @@ var (
 	OGG = recording("call.ogg", "audio/ogg", "OggS\x00")
 )
 
-func recording(name, mediaType, data string) llm.Attachment {
-	return llm.Attachment{Kind: llm.AttachmentAudio, Name: name, MediaType: mediaType, Data: []byte(data)}
+func recording(name, mediaType, data string) attachment.Attachment {
+	return attachment.Attachment{Kind: attachment.Audio, Name: name, MediaType: mediaType, Data: []byte(data)}
 }
 
 // BodyMarks is the lifetime of every marker in a chat-completions body, keyed
@@ -360,15 +364,15 @@ func BodyMarks(t *testing.T, body []byte) map[int]string {
 }
 
 // Declare registers models under name for the test and withdraws them after.
-func Declare(t *testing.T, name string, models map[string]llm.Declared) {
+func Declare(t *testing.T, name string, models map[string]capability.Declared) {
 	t.Helper()
-	llm.RegisterDeclarations(name, models)
-	t.Cleanup(func() { llm.RegisterDeclarations(name, nil) })
+	capability.RegisterDeclarations(name, models)
+	t.Cleanup(func() { capability.RegisterDeclarations(name, nil) })
 }
 
 // ScopedNoSchema declares that a model takes no schema on flow alone.
-func ScopedNoSchema(flow llm.Flow) llm.Declared {
-	return llm.Declared{Flows: map[llm.Flow]map[string]any{flow: {"structured_outputs": false}}}
+func ScopedNoSchema(flow llmflow.Flow) capability.Declared {
+	return capability.Declared{Flows: map[llmflow.Flow]map[string]any{flow: {"structured_outputs": false}}}
 }
 
 // NestedArraySchema is a tool schema with an array of objects inside it, the

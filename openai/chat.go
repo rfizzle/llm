@@ -8,6 +8,11 @@ import (
 	"os"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/catalog"
+	"github.com/rfizzle/llm/decision"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -59,7 +64,7 @@ func NewChat(opts llm.ResolveOpts) (*Chat, error) {
 		client:    openai.NewClientWithConfig(cfg),
 		model:     model,
 		Deadline:  idle.Of(opts.StreamIdleSeconds),
-		classify:  llm.NewClassifier("openai", llm.CurrentApp().KeyVars("OPENAI_API_KEY"), key),
+		classify:  failure.NewClassifier("openai", llm.CurrentApp().KeyVars("OPENAI_API_KEY"), key),
 		decisions: decisionsEndpoint{client: &http.Client{}, baseURL: baseURL, apiKey: key},
 	}, nil
 }
@@ -68,17 +73,17 @@ func NewChatWith(client *openai.Client, model string) *Chat {
 	if model == "" {
 		model = defaultOpenAIModel
 	}
-	return &Chat{client: client, model: model, classify: llm.NewClassifier("openai", "OPENAI_API_KEY", "")}
+	return &Chat{client: client, model: model, classify: failure.NewClassifier("openai", "OPENAI_API_KEY", "")}
 }
 
 func (o *Chat) Name() string { return "openai" }
 
 // OffersDecisions answers from the floor: this is OpenAI's own endpoint, so
 // the models OpenAI documents the API for are the ones it offers.
-func (o *Chat) OffersDecisions(model string) bool { return decisionsOnFloor(model) }
+func (o *Chat) OffersDecisions(model string) bool { return DecisionsOnFloor(model) }
 
 // Decide sends one Decisions API request.
-func (o *Chat) Decide(ctx context.Context, req llm.DecisionRequest) (llm.DecisionResult, error) {
+func (o *Chat) Decide(ctx context.Context, req decision.Request) (decision.Result, error) {
 	if req.Model == "" {
 		req.Model = o.model
 	}
@@ -122,13 +127,13 @@ func (o *Chat) StreamCompletion(ctx context.Context, messages []llm.Message, opt
 	// A bounded auxiliary call needs a bounded visible answer as well as its
 	// completion ceiling. GPT-5.6 accepts this control on chat completions;
 	// older models are left on the SDK's ordinary request shape.
-	if opts.MaxTokens > 0 && responsesExplicitCache(req.Model) {
+	if opts.MaxTokens > 0 && ResponsesExplicitCache(req.Model) {
 		req.Verbosity = "low"
 	}
 	// Reasoning effort, fitted to the model: a rung it lacks becomes the
 	// highest it has, and a model with no reasoning gets no field, because
 	// `reasoning_effort` on gpt-4o is a 400.
-	if effort := opts.Effort.Fit(llm.CapabilitiesFor(req.Model)).OpenAIEffort(); effort != "" {
+	if effort := opts.Effort.Fit(capability.For(req.Model)).OpenAIEffort(); effort != "" {
 		req.ReasoningEffort = effort
 	}
 	// One or the other, never both (llm's provider.go). Strict is on because that
@@ -242,7 +247,7 @@ func openAIAttachmentParts(m llm.Message) []openai.ChatMessagePart {
 			Type: openai.ChatMessagePartTypeText,
 			Text: a.Label(),
 		})
-		if a.Kind == llm.AttachmentImage {
+		if a.Kind == attachment.Image {
 			parts = append(parts, openai.ChatMessagePart{
 				Type:     openai.ChatMessagePartTypeImageURL,
 				ImageURL: &openai.ChatMessageImageURL{URL: a.DataURL()},
@@ -272,8 +277,8 @@ func init() {
 		BaseURL:    defaultOpenAIBaseURL,
 		CheapModel: cheapOpenAIModel,
 	})
-	llm.RegisterDecisions("openai", decisionsOnFloor)
-	llm.RegisterModels("openai", []string{
+	decision.Register("openai", DecisionsOnFloor)
+	catalog.Register("openai", []string{
 		"gpt-5.6",
 		"gpt-5.5",
 		"gpt-5.4",
@@ -284,5 +289,5 @@ func init() {
 	})
 	// The compatible endpoints and OpenRouter speak this SDK too, and
 	// import this package, so their errors are read through this one.
-	llm.RegisterErrorShape(errorShape)
+	failure.RegisterErrorShape(errorShape)
 }

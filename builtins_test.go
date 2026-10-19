@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/catalog"
+	"github.com/rfizzle/llm/decision"
 	"github.com/rfizzle/llm/pricing"
 
 	// Every backend, the way an app ships them: each registers its names,
@@ -14,6 +17,7 @@ import (
 	_ "github.com/rfizzle/llm/compat"
 	_ "github.com/rfizzle/llm/gemini"
 	_ "github.com/rfizzle/llm/openai"
+	_ "github.com/rfizzle/llm/openai/responses"
 	_ "github.com/rfizzle/llm/openrouter"
 )
 
@@ -42,8 +46,9 @@ func TestHardcodedModelIDsArePriced(t *testing.T) {
 	}
 	// The openai-compatible default is the name a local runtime answers to,
 	// and no public table has ever keyed one. It is the one id here that is
-	// deliberately absent, and internal/provider's family floor — not the
-	// table — is what prices and sizes it.
+	// deliberately absent, and llm/catalog's context-window floor and
+	// llm/capability's family floor — not the table — are what size and
+	// describe it.
 	unpriceable := map[string]bool{llm.Defaults("openai-compatible").Model: true}
 
 	check := func(t *testing.T, where, model string) {
@@ -56,7 +61,7 @@ func TestHardcodedModelIDsArePriced(t *testing.T) {
 		}
 	}
 	for _, name := range llm.Available() {
-		for _, model := range llm.KnownModels(name) {
+		for _, model := range catalog.Models(name) {
 			t.Run(name+"/"+model, func(t *testing.T) {
 				check(t, "the "+name+" catalog", model)
 			})
@@ -104,7 +109,7 @@ func TestDefaults_CheapModel(t *testing.T) {
 		if d.CheapModel == d.Model {
 			t.Errorf("%s: the cheap model is the default model", name)
 		}
-		if !llm.CapabilitiesFor(d.CheapModel).Known {
+		if !capability.For(d.CheapModel).Known {
 			t.Errorf("%s: nothing describes %q", name, d.CheapModel)
 		}
 	}
@@ -124,7 +129,7 @@ func TestCapabilities_DecisionsAreDeclaredNotGuessed(t *testing.T) {
 	if !llm.IsBuiltin("openai-compatible") {
 		t.Fatal("openai-compatible should be a built-in here")
 	}
-	if llm.DecisionsDeclared("openai-compatible", "gpt-6-luna") {
+	if decision.Declared("openai-compatible", "gpt-6-luna") {
 		t.Error("an endpoint nothing declares should offer nothing")
 	}
 }

@@ -30,7 +30,7 @@ import (
 //
 //	ACME_CACHE_IT_URL=https://api.anthropic.com \
 //	ACME_CACHE_IT_KEY=sk-… \
-//	go test ./internal/provider -run CacheIntegration -v
+//	go test . -tags integration -run CacheIntegration -v
 //
 // The prefix is deliberately far above the minimum cacheable size. That
 // minimum differs by model — it is larger for the small ones — and a prefix
@@ -161,7 +161,7 @@ func TestPromptCacheIntegrationOverAConversation(t *testing.T) {
 //
 //	ACME_CACHE_IT_GATEWAY_URL=https://openrouter.ai/api/v1 \
 //	ACME_CACHE_IT_GATEWAY_KEY=sk-… \
-//	go test ./internal/provider -run CacheIntegration -v
+//	go test . -tags integration -run CacheIntegration -v
 func TestPromptCacheIntegrationThroughAGateway(t *testing.T) {
 	base, key := os.Getenv("ACME_CACHE_IT_GATEWAY_URL"), os.Getenv("ACME_CACHE_IT_GATEWAY_KEY")
 	if base == "" || key == "" {

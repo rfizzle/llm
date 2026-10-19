@@ -6,13 +6,23 @@
 // logger.
 //
 // The backends are packages of their own: llm/anthropic, llm/openai (chat
-// completions, the Responses API and the ChatGPT plan route), llm/gemini,
-// llm/openrouter and llm/compat (any OpenAI-compatible endpoint). Each
-// registers its provider names from its init, the way a database/sql driver
-// does, so an app imports the backends it ships, for their side effect where
-// it only resolves them by name:
+// completions), llm/openai/responses (the Responses API and the ChatGPT plan
+// route), llm/gemini, llm/openrouter and llm/compat (any OpenAI-compatible
+// endpoint). Each registers its provider names from its init, the way a
+// database/sql driver does, so an app imports the backends it ships, for
+// their side effect where it only resolves them by name:
 //
 //	import _ "github.com/rfizzle/llm/anthropic"
 //
 // and Resolve answers for those names and no others.
+//
+// The vocabularies an app reads are packages of their own: llm/failure (what
+// went wrong), llm/flow (which bounded call a request is), llm/capability
+// (what a model can be asked, and what a profile declares about it),
+// llm/effort (the reasoning level), llm/attachment, llm/cache (prompt-cache
+// lifetimes and the fields a response reports), llm/catalog (which models a
+// provider serves), llm/decision (the Decisions API) and llm/toolvalue (the
+// structured part of a tool result). This package holds the message,
+// tool-call, stream and usage types, the provider registry and the caller's
+// identity, and nothing else.
 package llm

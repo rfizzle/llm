@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 	llmopenai "github.com/rfizzle/llm/openai"
 	openai "github.com/sashabaranov/go-openai"
@@ -56,7 +58,7 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 		baseURL:  baseURL,
 		name:     name,
 		Deadline: idle.Of(opts.StreamIdleSeconds),
-		classify: llm.NewClassifier(name, llm.CurrentApp().APIKeyVar(), key),
+		classify: failure.NewClassifier(name, llm.CurrentApp().APIKeyVar(), key),
 	}, nil
 }
 
@@ -64,7 +66,7 @@ func NewWith(client *openai.Client, model, baseURL string) *Provider {
 	if model == "" {
 		model = defaultCompatModel
 	}
-	return &Provider{client: client, model: model, baseURL: baseURL, name: "openai-compatible", classify: llm.NewClassifier("openai-compatible", llm.CurrentApp().APIKeyVar(), "")}
+	return &Provider{client: client, model: model, baseURL: baseURL, name: "openai-compatible", classify: failure.NewClassifier("openai-compatible", llm.CurrentApp().APIKeyVar(), "")}
 }
 
 // NewNamed builds a compat provider over an already-configured
@@ -77,7 +79,7 @@ func NewNamed(client *openai.Client, model, baseURL, name string) *Provider {
 		// say which gateway, and the profile's name is the only
 		// place that is known.
 		p.name = name
-		p.classify = llm.NewClassifier(name, llm.CurrentApp().APIKeyVar(), "")
+		p.classify = failure.NewClassifier(name, llm.CurrentApp().APIKeyVar(), "")
 	}
 	return p
 }
@@ -200,7 +202,7 @@ func (o *Provider) StreamCompletion(ctx context.Context, messages []llm.Message,
 	// known about the model is the only judge of the two fields below; the
 	// table answers where it has an entry and the family floor where it
 	// does not.
-	caps := llm.CapabilitiesFor(req.Model)
+	caps := capability.For(req.Model)
 	if opts.MaxTokens > 0 {
 		// The ceiling goes in whichever field this endpoint will take.
 		// OpenAI deprecated `max_tokens` and its reasoning families refuse

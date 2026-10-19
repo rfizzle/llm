@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/decision"
+	"github.com/rfizzle/llm/failure"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -22,9 +24,9 @@ import (
 // decisions.
 var decisionsFloor = []string{"gpt-6-luna"}
 
-// decisionsOnFloor reports whether the native OpenAI providers offer the
+// DecisionsOnFloor reports whether the native OpenAI providers offer the
 // Decisions API on model.
-func decisionsOnFloor(model string) bool {
+func DecisionsOnFloor(model string) bool {
 	name := strings.ToLower(strings.TrimSpace(model))
 	if i := strings.LastIndex(name, "/"); i >= 0 {
 		name = name[i+1:]
@@ -46,18 +48,18 @@ type decisionsWire struct {
 }
 
 type decisionsQuestion struct {
-	Type         llm.QuestionType `json:"type"`
-	Name         string           `json:"name"`
-	Instructions string           `json:"instructions"`
+	Type         decision.QuestionType `json:"type"`
+	Name         string                `json:"name"`
+	Instructions string                `json:"instructions"`
 }
 
 // decisionsReply is the response. The probability is a pointer so a
 // predicate answer that carries none is told apart from one that said zero.
 type decisionsReply struct {
 	Answers []struct {
-		Type        llm.AnswerType `json:"type"`
-		Name        string         `json:"name"`
-		Probability *float64       `json:"probability"`
+		Type        decision.AnswerType `json:"type"`
+		Name        string              `json:"name"`
+		Probability *float64            `json:"probability"`
 	} `json:"answers"`
 	Usage *struct {
 		InputTokens int `json:"input_tokens"`
@@ -75,16 +77,16 @@ const estimatedBytesPerToken = 4
 // PostDecisions sends one request to {baseURL}/decisions over client, with
 // the key as a bearer token, and names any failure the way every dialect
 // names one, under the provider called name.
-func PostDecisions(ctx context.Context, client *http.Client, baseURL, apiKey, name string, req llm.DecisionRequest) (llm.DecisionResult, error) {
-	classify := llm.NewClassifier(name, llm.CurrentApp().KeyVars("OPENAI_API_KEY"), apiKey)
+func PostDecisions(ctx context.Context, client *http.Client, baseURL, apiKey, name string, req decision.Request) (decision.Result, error) {
+	classify := failure.NewClassifier(name, llm.CurrentApp().KeyVars("OPENAI_API_KEY"), apiKey)
 	res, err := postDecisions(ctx, client, baseURL, apiKey, req)
 	if err != nil {
-		return llm.DecisionResult{}, classify(err)
+		return decision.Result{}, classify(err)
 	}
 	return res, nil
 }
 
-func postDecisions(ctx context.Context, client *http.Client, baseURL, apiKey string, req llm.DecisionRequest) (llm.DecisionResult, error) {
+func postDecisions(ctx context.Context, client *http.Client, baseURL, apiKey string, req decision.Request) (decision.Result, error) {
 	if client == nil {
 		client = &http.Client{}
 	}
@@ -96,12 +98,12 @@ func postDecisions(ctx context.Context, client *http.Client, baseURL, apiKey str
 	}
 	body, err := json.Marshal(wire)
 	if err != nil {
-		return llm.DecisionResult{}, err
+		return decision.Result{}, err
 	}
 	endpoint := strings.TrimSuffix(baseURL, "/") + "/decisions"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return llm.DecisionResult{}, err
+		return decision.Result{}, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if apiKey != "" {
@@ -109,17 +111,17 @@ func postDecisions(ctx context.Context, client *http.Client, baseURL, apiKey str
 	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return llm.DecisionResult{}, err
+		return decision.Result{}, err
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxDecisionsBody))
 	if err != nil {
-		return llm.DecisionResult{}, err
+		return decision.Result{}, err
 	}
 	if resp.StatusCode/100 != 2 {
 		// The SDK's own error type, so the failure taxonomy reads the status
 		// and the body exactly as it reads a refused completion's.
-		return llm.DecisionResult{}, &openai.RequestError{
+		return decision.Result{}, &openai.RequestError{
 			HTTPStatus:     resp.Status,
 			HTTPStatusCode: resp.StatusCode,
 			Err:            fmt.Errorf("decisions: %s", resp.Status),
@@ -128,17 +130,17 @@ func postDecisions(ctx context.Context, client *http.Client, baseURL, apiKey str
 	}
 	var reply decisionsReply
 	if err := json.Unmarshal(raw, &reply); err != nil {
-		return llm.DecisionResult{}, fmt.Errorf("decisions: unreadable response: %w", err)
+		return decision.Result{}, fmt.Errorf("decisions: unreadable response: %w", err)
 	}
-	var out llm.DecisionResult
+	var out decision.Result
 	for _, a := range reply.Answers {
-		answer := llm.DecisionAnswer{Type: a.Type, Name: a.Name}
-		if a.Type == llm.AnswerPredicate {
+		answer := decision.Answer{Type: a.Type, Name: a.Name}
+		if a.Type == decision.AnswerPredicate {
 			// A predicate with no probability, or one outside the unit
 			// interval, is not an answer anybody can hold against a
 			// threshold, so the request is a failure rather than a guess.
 			if a.Probability == nil || math.IsNaN(*a.Probability) || *a.Probability < 0 || *a.Probability > 1 {
-				return llm.DecisionResult{}, fmt.Errorf("decisions: answer %q carries no probability", a.Name)
+				return decision.Result{}, fmt.Errorf("decisions: answer %q carries no probability", a.Name)
 			}
 			answer.Probability = *a.Probability
 		}

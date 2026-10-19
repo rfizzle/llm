@@ -9,13 +9,16 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/effort"
+	"github.com/rfizzle/llm/flow"
 	"github.com/rfizzle/llm/internal/llmtest"
 )
 
 // On one model, the classifier's flow is sent its tool and no format, and
 // the backlog's is sent the format and no tools.
 func TestAnthropic_ScopedNoSchemaSendsTheToolForThatFlowOnly(t *testing.T) {
-	llmtest.Declare(t, "gw", map[string]llm.Declared{"claude-sonnet-5-5": llmtest.ScopedNoSchema(llm.FlowClassifier)})
+	llmtest.Declare(t, "gw", map[string]capability.Declared{"claude-sonnet-5-5": llmtest.ScopedNoSchema(flow.Classifier)})
 
 	var body map[string]any
 	srv := llmtest.HTTP.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -29,12 +32,12 @@ func TestAnthropic_ScopedNoSchemaSendsTheToolForThatFlowOnly(t *testing.T) {
 	defer srv.Close()
 	p := newTestAnthropic(llm.ResolveOpts{APIKey: "sk-test", BaseURL: srv.URL})
 
-	send := func(flow llm.Flow) {
+	send := func(flow flow.Flow) {
 		t.Helper()
 		events, err := p.StreamCompletion(context.Background(), []llm.Message{{Role: llm.RoleUser, Content: "hi"}}, llm.CompletionOpts{
 			Model:          "claude-sonnet-5-5",
 			Flow:           flow,
-			Effort:         llm.EffortLow,
+			Effort:         effort.Low,
 			Tools:          []llm.Tool{{Name: "answer", Parameters: json.RawMessage(`{"type":"object","properties":{}}`)}},
 			ToolChoice:     llm.ToolChoiceAuto,
 			ResponseSchema: &llm.ResponseSchema{Name: "answer", Schema: json.RawMessage(`{"type":"object","additionalProperties":false}`)},
@@ -45,7 +48,7 @@ func TestAnthropic_ScopedNoSchemaSendsTheToolForThatFlowOnly(t *testing.T) {
 		_, _, _, _ = llmtest.Drain(t, events)
 	}
 
-	send(llm.FlowClassifier)
+	send(flow.Classifier)
 	config, _ := body["output_config"].(map[string]any)
 	if _, ok := config["format"]; ok {
 		t.Errorf("classifier: no format may be sent, got %v", config["format"])
@@ -57,7 +60,7 @@ func TestAnthropic_ScopedNoSchemaSendsTheToolForThatFlowOnly(t *testing.T) {
 		t.Errorf("classifier: tool_choice should be auto, got %v", body["tool_choice"])
 	}
 
-	send(llm.FlowBacklog)
+	send(flow.Backlog)
 	config, _ = body["output_config"].(map[string]any)
 	if format, _ := config["format"].(map[string]any); format["type"] != "json_schema" {
 		t.Errorf("backlog: the format must be sent, got %v", body["output_config"])
@@ -95,8 +98,8 @@ func TestDeclarations_PromptCacheOffChangesNoRequest(t *testing.T) {
 		return body
 	}
 	before := send()
-	llmtest.Declare(t, "gw", map[string]llm.Declared{model: {Model: map[string]any{llm.KeyPromptCache: false}}})
-	if !llm.CapabilitiesFor(model).NoPromptCache {
+	llmtest.Declare(t, "gw", map[string]capability.Declared{model: {Model: map[string]any{capability.KeyPromptCache: false}}})
+	if !capability.For(model).NoPromptCache {
 		t.Fatal("the declaration did not narrow the model")
 	}
 	after := send()

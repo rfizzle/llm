@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
 	"github.com/rfizzle/llm/internal/llmtest"
 )
 
@@ -50,7 +51,7 @@ func gatewayStream(t *testing.T, usageChunk string) (llm.Usage, []byte) {
 func TestOpenAI_StreamCompletion_ReadsAGatewaysCacheWrites(t *testing.T) {
 	usage, _ := gatewayStream(t, `{"id":"c","object":"chat.completion.chunk","choices":[],"usage":{"prompt_tokens":2400,"completion_tokens":9,"total_tokens":2409,"prompt_tokens_details":{"cached_tokens":1800},"cache_creation_input_tokens":500}}`)
 	want := llm.Usage{PromptTokens: 2400, CompletionTokens: 9, CachedTokens: 1800, CacheCreationTokens: 500,
-		Reports: llm.FieldCachedTokens | llm.FieldCacheCreation}
+		Reports: cache.FieldCachedTokens | cache.FieldCreation}
 	if usage != want {
 		t.Errorf("usage = %+v, want %+v", usage, want)
 	}
@@ -76,7 +77,7 @@ func TestOpenAI_StreamCompletion_UsageUnchangedWithoutTheField(t *testing.T) {
 	if !bytes.Equal(sentWithout, sentWith) || len(sentWith) == 0 {
 		t.Errorf("the request changed with the response:\n%s\n%s", sentWithout, sentWith)
 	}
-	want := llm.Usage{PromptTokens: 2400, CompletionTokens: 9, CachedTokens: 1800, Reports: llm.FieldCachedTokens}
+	want := llm.Usage{PromptTokens: 2400, CompletionTokens: 9, CachedTokens: 1800, Reports: cache.FieldCachedTokens}
 	if without != want {
 		t.Errorf("usage = %+v, want %+v", without, want)
 	}

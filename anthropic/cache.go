@@ -2,14 +2,14 @@ package anthropic
 
 import (
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
 	"github.com/rfizzle/llm/internal/cachemarks"
 )
 
 // markAnthropicCache places the plan's markers on a Messages API request, all
-// of them at the session's lifetime (DefaultCacheTTL).
-func markAnthropicCache(params *anthropic.MessageNewParams, ttl llm.CacheTTL) {
-	ttl = llm.CacheTTLOrDefault(string(ttl))
+// of them at the session's lifetime (cache.DefaultTTL).
+func markAnthropicCache(params *anthropic.MessageNewParams, ttl cache.TTL) {
+	ttl = cache.TTLOrDefault(string(ttl))
 	marks := cachemarks.Plan(len(params.System) > 0, len(params.Messages))
 	if marks.Head {
 		params.System[len(params.System)-1].CacheControl = cacheControl(ttl)
@@ -20,7 +20,7 @@ func markAnthropicCache(params *anthropic.MessageNewParams, ttl llm.CacheTTL) {
 }
 
 // cacheControl is one marker at a chosen lifetime.
-func cacheControl(ttl llm.CacheTTL) anthropic.CacheControlEphemeralParam {
+func cacheControl(ttl cache.TTL) anthropic.CacheControlEphemeralParam {
 	cc := anthropic.NewCacheControlEphemeralParam()
 	cc.TTL = anthropic.CacheControlEphemeralTTL(ttl)
 	return cc
@@ -36,7 +36,7 @@ func cacheControl(ttl llm.CacheTTL) anthropic.CacheControlEphemeralParam {
 // an earlier block of the same message is worth doing anyway: the prefix it
 // caches is shorter by the tail of one message and still covers everything
 // before it.
-func markLastBlock(blocks []anthropic.ContentBlockParamUnion, ttl llm.CacheTTL) bool {
+func markLastBlock(blocks []anthropic.ContentBlockParamUnion, ttl cache.TTL) bool {
 	for i := len(blocks) - 1; i >= 0; i-- {
 		if cc := blocks[i].GetCacheControl(); cc != nil {
 			*cc = cacheControl(ttl)

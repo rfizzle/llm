@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
 	"github.com/rfizzle/llm/internal/llmtest"
 )
 
@@ -12,7 +13,7 @@ func TestToAnthropicMessages_ImageLeadsTheMessage(t *testing.T) {
 	_, out := toAnthropicMessages([]llm.Message{{
 		Role:        llm.RoleUser,
 		Content:     "what is wrong here?",
-		Attachments: []llm.Attachment{llmtest.PNG, llmtest.Notes},
+		Attachments: []attachment.Attachment{llmtest.PNG, llmtest.Notes},
 	}})
 	if len(out) != 1 {
 		t.Fatalf("got %d messages, want 1", len(out))
@@ -35,7 +36,7 @@ func TestToAnthropicMessages_ImageLeadsTheMessage(t *testing.T) {
 func TestToAnthropicMessages_EmptySentenceStillSendsOneBlock(t *testing.T) {
 	// Attaching and pressing enter with nothing typed must not produce a
 	// message with no content at all, which the API rejects.
-	_, out := toAnthropicMessages([]llm.Message{{Role: llm.RoleUser, Attachments: []llm.Attachment{llmtest.PNG}}})
+	_, out := toAnthropicMessages([]llm.Message{{Role: llm.RoleUser, Attachments: []attachment.Attachment{llmtest.PNG}}})
 	if len(out) != 1 || len(out[0].Content) != 2 || out[0].Content[1].OfImage == nil {
 		t.Fatalf("got %#v", out)
 	}
@@ -48,7 +49,7 @@ func TestToAnthropicMessages_EmptySentenceStillSendsOneBlock(t *testing.T) {
 
 func TestAudioDegradesOnTheDialectsWithNoPartForIt(t *testing.T) {
 	// The Messages API takes no recording at all.
-	_, out := toAnthropicMessages([]llm.Message{{Role: llm.RoleUser, Attachments: []llm.Attachment{llmtest.MP3}}})
+	_, out := toAnthropicMessages([]llm.Message{{Role: llm.RoleUser, Attachments: []attachment.Attachment{llmtest.MP3}}})
 	block := out[0].Content[1]
 	if block.OfText == nil || !strings.Contains(block.OfText.Text, "could not be sent") {
 		t.Fatalf("anthropic block = %#v", block)
@@ -59,7 +60,7 @@ func TestToAnthropicMessages_LabelLeadsEachAttachment(t *testing.T) {
 	for _, tc := range llmtest.LabelledCases(t) {
 		t.Run(tc.Name, func(t *testing.T) {
 			_, out := toAnthropicMessages([]llm.Message{{
-				Role: llm.RoleUser, Content: tc.Att.Handle + " shows it", Attachments: []llm.Attachment{tc.Att},
+				Role: llm.RoleUser, Content: tc.Att.Handle + " shows it", Attachments: []attachment.Attachment{tc.Att},
 			}})
 			blocks := out[0].Content
 			if len(blocks) != 3 {
@@ -69,11 +70,11 @@ func TestToAnthropicMessages_LabelLeadsEachAttachment(t *testing.T) {
 				t.Fatalf("first block = %#v, want the label %q", blocks[0].OfText, tc.Label)
 			}
 			switch tc.Att.Kind {
-			case llm.AttachmentImage:
+			case attachment.Image:
 				if blocks[1].OfImage == nil {
 					t.Fatal("the picture should follow its label")
 				}
-			case llm.AttachmentDocument:
+			case attachment.Document:
 				if blocks[1].OfDocument == nil {
 					t.Fatal("the document should follow its label")
 				}

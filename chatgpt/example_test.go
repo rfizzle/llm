@@ -11,7 +11,7 @@ import (
 
 	// The plan route is a mode of the Responses backend, which makes
 	// "chatgpt" resolvable when it is imported.
-	_ "github.com/rfizzle/llm/openai"
+	_ "github.com/rfizzle/llm/openai/responses"
 )
 
 // Example_signedOut opens an account over a FileStore and asks it for a

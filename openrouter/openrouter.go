@@ -9,6 +9,10 @@ import (
 	"os"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/catalog"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 	llmopenai "github.com/rfizzle/llm/openai"
 	openai "github.com/sashabaranov/go-openai"
@@ -51,7 +55,7 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 	cfg.BaseURL = baseURL
 	cfg.HTTPClient = &http.Client{
 		Transport: &openRouterTransport{
-			base: llm.NewCacheMarkTransport(http.DefaultTransport, opts.CacheTTL),
+			base: cache.NewMarkTransport(http.DefaultTransport, opts.CacheTTL),
 		},
 	}
 
@@ -59,7 +63,7 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 		client:   openai.NewClientWithConfig(cfg),
 		model:    model,
 		Deadline: idle.Of(opts.StreamIdleSeconds),
-		classify: llm.NewClassifier("openrouter", llm.CurrentApp().KeyVars("OPENROUTER_API_KEY"), key),
+		classify: failure.NewClassifier("openrouter", llm.CurrentApp().KeyVars("OPENROUTER_API_KEY"), key),
 	}, nil
 }
 
@@ -71,7 +75,7 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 // The cache breakpoints are the other such property and are no longer here.
 // They belong to every path that sends this dialect to a gateway, not to this
 // provider, so they sit underneath as their own round tripper
-// (NewCacheMarkTransport) — which is what a profile route wraps too.
+// (cache.NewMarkTransport) — which is what a profile route wraps too.
 type openRouterTransport struct {
 	base http.RoundTripper
 }
@@ -120,7 +124,7 @@ func NewWith(client *openai.Client, model string) *Provider {
 	return &Provider{
 		client:   client,
 		model:    model,
-		classify: llm.NewClassifier("openrouter", llm.CurrentApp().KeyVars("OPENROUTER_API_KEY"), ""),
+		classify: failure.NewClassifier("openrouter", llm.CurrentApp().KeyVars("OPENROUTER_API_KEY"), ""),
 	}
 }
 
@@ -160,7 +164,7 @@ func (o *Provider) StreamCompletion(ctx context.Context, messages []llm.Message,
 	// Reasoning effort, fitted to the model: a rung it lacks becomes the
 	// highest it has, and a model with no reasoning gets no field, because
 	// `reasoning_effort` on gpt-4o is a 400.
-	if effort := opts.Effort.Fit(llm.CapabilitiesFor(req.Model)).OpenAIEffort(); effort != "" {
+	if effort := opts.Effort.Fit(capability.For(req.Model)).OpenAIEffort(); effort != "" {
 		req.ReasoningEffort = effort
 	}
 	if len(opts.Tools) > 0 {
@@ -192,7 +196,7 @@ func init() {
 		BaseURL:    defaultOpenRouterBaseURL,
 		CheapModel: cheapOpenRouterModel,
 	})
-	llm.RegisterModels("openrouter", []string{
+	catalog.Register("openrouter", []string{
 		"anthropic/claude-opus-5",
 		"anthropic/claude-sonnet-4.6",
 		"anthropic/claude-haiku-4.5",

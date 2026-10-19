@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/catalog"
 	"github.com/rfizzle/llm/compat"
 	"github.com/rfizzle/llm/internal/llmtest"
 	"github.com/rfizzle/llm/internal/testhttp"
 	llmopenai "github.com/rfizzle/llm/openai"
+	"github.com/rfizzle/llm/openai/responses"
 	"github.com/rfizzle/llm/openrouter"
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -96,9 +99,9 @@ func TestOpenAI_ListModelsSatisfiesModelLister(t *testing.T) {
 		"openrouter": newOpenRouter(srv.URL+"/v1", "openai/gpt-4o"),
 		"compat":     newCompat(srv.URL+"/v1", "llama3"),
 	} {
-		lister, ok := p.(llm.ModelLister)
+		lister, ok := p.(catalog.Lister)
 		if !ok {
-			t.Fatalf("%s should implement ModelLister", name)
+			t.Fatalf("%s should implement catalog.Lister", name)
 		}
 		names, err := lister.ListModels(context.Background())
 		if err != nil {
@@ -153,7 +156,7 @@ func TestStreamOpenAI_AToolRoundReportsTheUsageThatFollowsIt(t *testing.T) {
 			if final.Usage == nil {
 				t.Fatal("a tool round reported no usage, so nothing downstream can bill it")
 			}
-			want := llm.Usage{PromptTokens: 999, CompletionTokens: 42, CachedTokens: 128, Reports: llm.FieldCachedTokens}
+			want := llm.Usage{PromptTokens: 999, CompletionTokens: 42, CachedTokens: 128, Reports: cache.FieldCachedTokens}
 			if *final.Usage != want {
 				t.Errorf("usage = %+v, want %+v", *final.Usage, want)
 			}
@@ -329,12 +332,12 @@ func newCompat(baseURL, model string) *compat.Provider {
 func newOpenRouter(baseURL string, model string) *openrouter.Provider {
 	cfg := openai.DefaultConfig("test-key")
 	cfg.BaseURL = baseURL
-	cfg.HTTPClient = &http.Client{Transport: llm.NewCacheMarkTransport(&llmtest.HTTP, "")}
+	cfg.HTTPClient = &http.Client{Transport: cache.NewMarkTransport(&llmtest.HTTP, "")}
 	return openrouter.NewWith(openai.NewClientWithConfig(cfg), model)
 }
 
-func newResponses(baseURL, model string) *llmopenai.Responses {
-	return llmopenai.NewResponsesWith(llmtest.HTTP.Client(), "test-key", baseURL+"/v1", model, "")
+func newResponses(baseURL, model string) *responses.Provider {
+	return responses.NewWith(llmtest.HTTP.Client(), "test-key", baseURL+"/v1", model, "")
 }
 
 // dialectResponsesServer stands in for the /v1/responses endpoint, replaying

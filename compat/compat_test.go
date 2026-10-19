@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/catalog"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 	"github.com/rfizzle/llm/internal/llmtest"
 	openai "github.com/sashabaranov/go-openai"
@@ -175,7 +177,7 @@ func TestOpenAICompat_StreamCompletion_ServerError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for 401")
 	}
-	if !errors.Is(err, llm.ErrAuth) {
+	if !errors.Is(err, failure.ErrAuth) {
 		t.Errorf("expected ErrAuth, got: %v", err)
 	}
 }
@@ -344,7 +346,7 @@ func TestOpenAICompat_ModelWindowsError(t *testing.T) {
 
 func TestOpenAICompatIsAModelWindower(t *testing.T) {
 	var p llm.Provider = &Provider{}
-	if _, ok := p.(llm.ModelWindower); !ok {
+	if _, ok := p.(catalog.Windower); !ok {
 		t.Fatal("the compat provider should answer for its endpoint's windows")
 	}
 }

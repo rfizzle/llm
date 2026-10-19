@@ -12,6 +12,12 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/rfizzle/llm"
+	"github.com/rfizzle/llm/attachment"
+	"github.com/rfizzle/llm/cache"
+	"github.com/rfizzle/llm/capability"
+	"github.com/rfizzle/llm/catalog"
+	"github.com/rfizzle/llm/effort"
+	"github.com/rfizzle/llm/failure"
 	"github.com/rfizzle/llm/internal/idle"
 )
 
@@ -34,9 +40,9 @@ const anthropicAnswerFloor = 4096
 type Provider struct {
 	client anthropic.Client
 	model  string
-	// cacheTTL is how long the request's fixed head is cached for (llm's
-	// cache.go).
-	cacheTTL llm.CacheTTL
+	// cacheTTL is how long the request's fixed head is cached for
+	// (llm/cache).
+	cacheTTL cache.TTL
 	// Deadline ends a turn whose stream stops writing (internal/idle).
 	idle.Deadline
 	classify func(error) error
@@ -56,9 +62,9 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 	return &Provider{
 		client:   anthropic.NewClient(clientOpts...),
 		model:    cmp.Or(opts.Model, defaultAnthropicModel),
-		cacheTTL: llm.CacheTTLOrDefault(opts.CacheTTL),
+		cacheTTL: cache.TTLOrDefault(opts.CacheTTL),
 		Deadline: idle.Of(opts.StreamIdleSeconds),
-		classify: llm.NewClassifier("anthropic", llm.CurrentApp().KeyVars("ANTHROPIC_API_KEY"), key),
+		classify: failure.NewClassifier("anthropic", llm.CurrentApp().KeyVars("ANTHROPIC_API_KEY"), key),
 	}, nil
 }
 
@@ -77,14 +83,14 @@ func NewWith(client anthropic.Client, model string) *Provider {
 // the default. A profile route reaches that API over the same markers the
 // direct path uses, so a lifetime honoured on one and hardcoded on the other
 // made the same session's opening expire at different times depending on
-// which address it was pointed at (llm's cache.go).
+// which address it was pointed at (llm/cache).
 func NewNamed(client anthropic.Client, model, name, cacheTTL string) *Provider {
 	name = cmp.Or(name, "anthropic")
 	return &Provider{
 		client:   client,
 		model:    cmp.Or(model, defaultAnthropicModel),
-		cacheTTL: llm.CacheTTLOrDefault(cacheTTL),
-		classify: llm.NewClassifier(name, llm.CurrentApp().KeyVars("ANTHROPIC_API_KEY"), ""),
+		cacheTTL: cache.TTLOrDefault(cacheTTL),
+		classify: failure.NewClassifier(name, llm.CurrentApp().KeyVars("ANTHROPIC_API_KEY"), ""),
 	}
 }
 
@@ -98,8 +104,8 @@ func (a *Provider) Name() string { return "anthropic" }
 // budget asks for no thinking rather than sending a request the API will
 // refuse. Off sends nothing either way — on a model that always thinks that
 // is its own default, which is the most "off" it has.
-func applyAnthropicThinking(params *anthropic.MessageNewParams, effort llm.Effort, model string, maxTokens int) {
-	caps := llm.CapabilitiesFor(model)
+func applyAnthropicThinking(params *anthropic.MessageNewParams, effort effort.Level, model string, maxTokens int) {
+	caps := capability.For(model)
 	effort = effort.Fit(caps)
 	if !effort.On() {
 		return
@@ -310,13 +316,13 @@ func anthropicUsage(u anthropic.Usage) *llm.Usage {
 		CacheCreation1h:     int(u.CacheCreation.Ephemeral1hInputTokens),
 	}
 	if u.JSON.CacheReadInputTokens.Valid() || cached > 0 {
-		usage.Reports |= llm.FieldCacheRead
+		usage.Reports |= cache.FieldRead
 	}
 	if u.JSON.CacheCreationInputTokens.Valid() || created > 0 {
-		usage.Reports |= llm.FieldCacheCreation
+		usage.Reports |= cache.FieldCreation
 	}
 	if u.JSON.CacheCreation.Valid() || usage.CacheCreation5m+usage.CacheCreation1h > 0 {
-		usage.Reports |= llm.FieldCacheLease
+		usage.Reports |= cache.FieldLease
 	}
 	return usage
 }
@@ -515,14 +521,14 @@ func toAnthropicMessages(messages []llm.Message) (system string, out []anthropic
 // else worth saying. Attachments this dialect cannot take are dropped rather
 // than described — the tool's own text already says what the file was, and
 // repeating it as a note would say it twice.
-func anthropicToolResult(id, content string, isError bool, atts []llm.Attachment) anthropic.ContentBlockParamUnion {
+func anthropicToolResult(id, content string, isError bool, atts []attachment.Attachment) anthropic.ContentBlockParamUnion {
 	block := anthropic.ToolResultBlockParam{
 		ToolUseID: id,
 		Content:   []anthropic.ToolResultBlockParamContentUnion{{OfText: &anthropic.TextBlockParam{Text: content}}},
 		IsError:   anthropic.Bool(isError),
 	}
 	for _, a := range atts {
-		if a.Kind != llm.AttachmentImage {
+		if a.Kind != attachment.Image {
 			continue
 		}
 		block.Content = append(block.Content, anthropic.ToolResultBlockParamContentUnion{
@@ -544,14 +550,14 @@ func anthropicToolResult(id, content string, isError bool, atts []llm.Attachment
 // the shared text form, which is also what a text attachment always is. Each
 // is led by its label, a text block of its own, which is the Messages API's
 // guidance for several pictures in one message.
-func anthropicAttachmentBlocks(atts []llm.Attachment) []anthropic.ContentBlockParamUnion {
+func anthropicAttachmentBlocks(atts []attachment.Attachment) []anthropic.ContentBlockParamUnion {
 	var blocks []anthropic.ContentBlockParamUnion
 	for _, a := range atts {
 		blocks = append(blocks, anthropic.NewTextBlock(a.Label()))
 		switch {
-		case a.Kind == llm.AttachmentImage:
+		case a.Kind == attachment.Image:
 			blocks = append(blocks, anthropic.NewImageBlockBase64(a.MediaType, a.Base64()))
-		case a.Kind == llm.AttachmentDocument && a.MediaType == "application/pdf":
+		case a.Kind == attachment.Document && a.MediaType == "application/pdf":
 			blocks = append(blocks, anthropic.NewDocumentBlock(anthropic.Base64PDFSourceParam{
 				Data: a.Base64(),
 			}))
@@ -621,7 +627,7 @@ func anthropicOutputFormat(raw json.RawMessage) anthropic.JSONOutputFormatParam 
 // wants prose from costing the cached prefix: the tools sit in front of the
 // system prompt in what the API hashes, so a request without them shares no
 // prefix with the session's other requests and rebuilds the whole head. The
-// choice itself is not part of that prefix (llm's cache.go).
+// choice itself is not part of that prefix (llm/cache).
 func toAnthropicToolChoice(choice string) (anthropic.ToolChoiceUnionParam, bool) {
 	switch choice {
 	case llm.ToolChoiceAuto:
@@ -656,7 +662,7 @@ func init() {
 		Model:      defaultAnthropicModel,
 		CheapModel: cheapAnthropicModel,
 	})
-	llm.RegisterModels("anthropic", []string{
+	catalog.Register("anthropic", []string{
 		"claude-fable-5-1",
 		"claude-opus-5",
 		"claude-sonnet-5",
@@ -664,5 +670,5 @@ func init() {
 		"claude-opus-4-7",
 		"claude-haiku-4-5",
 	})
-	llm.RegisterErrorShape(errorShape)
+	failure.RegisterErrorShape(errorShape)
 }

@@ -142,13 +142,3 @@ func TestCompletionOpts_SchemaFor(t *testing.T) {
 		}
 	}
 }
-
-func TestCacheFields_NamesReadBack(t *testing.T) {
-	all := FieldCacheRead | FieldCacheCreation | FieldCacheLease | FieldCachedTokens | FieldCachedContent
-	if got := CacheFieldsNamed(all.Names()); got != all {
-		t.Errorf("round trip: %v", got)
-	}
-	if got := CacheFieldsNamed([]string{"cached_tokens", "something_else"}); got != FieldCachedTokens {
-		t.Errorf("an unknown name: %v", got)
-	}
-}
