@@ -24,3 +24,4 @@ whose frontmatter has a `name` (matching the directory) and a `description`.
 | `project-docs` | yes | The document set, comments, where a fact belongs |
 | `sound-patterns` | yes | Settling style questions against the Go stdlib |
 | `go-conformance-suite` | yes | One test suite over several implementations of an interface |
+| `release` | | Cutting a tag of this module |

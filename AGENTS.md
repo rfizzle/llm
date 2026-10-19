@@ -44,6 +44,7 @@ rule); `sound-patterns` settles style (default to what the Go stdlib does).
 | Regenerate the built-in model-data snapshot | `make model-data` |
 | Everything CI runs | `make ci` |
 | List every target | `make help` |
+| Cut a tag | the `release` skill, `.agents/skills/release/SKILL.md` |
 
 ## Testing
 
@@ -61,8 +62,7 @@ rule); `sound-patterns` settles style (default to what the Go stdlib does).
   the fake endpoints, the stream drainers and the fixtures every dialect is
   fed. It imports the root package, so the root package's own tests cannot
   import it and keep their own copies.
-- The sign-in is tested against an in-memory authorization server
-  (`chatgpt/fake_test.go`); no test reaches OpenAI.
+- The sign-in's tests use an in-memory server (`chatgpt/fake_test.go`).
 - `make test` is cacheable on purpose: never add `-count=1`, and never
   `os.Chdir` or `t.Chdir` in a test.
 
