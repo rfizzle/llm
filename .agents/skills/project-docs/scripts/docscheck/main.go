@@ -358,14 +358,17 @@ func (c *checker) checkLink(path string, n int, target string) {
 // checkPath treats a backticked token as a repository path when it ends in a
 // slash (a directory claim), when its first segment is a top-level entry that
 // exists, or when it is a dotfile with a slash or a second dot. Import paths,
-// domains, URLs, flags, variables, globs and placeholders are left alone.
+// domains, URLs, flags, variables, globs, placeholders and paths outside the
+// repository are left alone.
 func (c *checker) checkPath(path string, n int, tok string) {
 	for _, bad := range []string{"://", "<", ">", "*", "$", "~", "{", "@", " "} {
 		if strings.Contains(tok, bad) {
 			return
 		}
 	}
-	if strings.HasPrefix(tok, "-") || strings.HasPrefix(tok, "/") {
+	// A path outside the repository (a sibling checkout) is not this
+	// repository's claim to keep true; CI has no sibling checkouts.
+	if strings.HasPrefix(tok, "-") || strings.HasPrefix(tok, "/") || strings.HasPrefix(tok, "..") {
 		return
 	}
 	file, _, _ := strings.Cut(tok, "#")
