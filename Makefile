@@ -49,10 +49,8 @@ vet: ## Run go vet over every tier's files
 lint: ## Run golangci-lint
 	@$(HERMETIC_ENV) $(GOLANGCI_LINT) run --modules-download-mode=readonly
 
-# The checker's own tests hold a work-item id as a fixture, in both the
-# vendored script and the skill's copy of it; the defaults are kept beside them.
 docs-check: ## Verify docs links and citations resolve, paths and make targets exist, and no work-item id leaks
-	@$(HERMETIC_ENV) $(GOCMD) run ./scripts/docscheck -skip .plan,.cache,node_modules,vendor,bin,dist,scripts/docscheck,.agents/skills/project-docs/scripts
+	@$(HERMETIC_ENV) $(GOCMD) run ./scripts/docscheck
 
 skills-sync: ## Refresh the shared skills from $(SKILLS_SOURCE); add new ones with SKILLS="a b" (local only)
 	@$(SKILLS_SOURCE)/scripts/sync -C . $(SKILLS)
