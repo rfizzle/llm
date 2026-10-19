@@ -46,5 +46,5 @@ sign-in hint a person is shown. Runnable examples, including a tool call,
 pricing a usage and the ChatGPT sign-in, are in `example_test.go`,
 `pricing/example_test.go` and `chatgpt/example_test.go`.
 
-The design is in `docs/` (planned); start at `docs/README.md`. Licensed under the MIT
+The design is in `docs/`; start at `docs/README.md`. Licensed under the MIT
 License.

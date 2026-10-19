@@ -139,7 +139,7 @@ type Usage struct {
 	//
 	// They are separate because they are priced apart: a read is a fraction
 	// of the input rate and a write is a premium over it.
-	// See the README's "Price a Usage" section.
+	// See docs/architecture.md#pricing-is-a-snapshot-table.
 	CachedTokens        int
 	CacheCreationTokens int
 	// CacheCreation5m and CacheCreation1h split CacheCreationTokens by the

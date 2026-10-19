@@ -295,7 +295,7 @@ func (t *Table) Cost(model string, tokensIn, tokensOut int64) (inputCost, output
 //
 // A caller that has no cache figures fills in Input and Output and gets
 // exactly what Cost has always answered.
-// See the README's "Price a Usage" section.
+// See docs/architecture.md#pricing-is-a-snapshot-table.
 type Tokens struct {
 	Input   int64
 	Cached  int64

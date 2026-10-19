@@ -4,7 +4,7 @@
 models, shared by more than one application. It is the provider plumbing: the
 message, tool-call, stream and usage types, one package per backend, the
 vocabularies an app reads, pricing and the ChatGPT plan sign-in. It holds no
-application's policy and names no app. The design is in `docs/` (planned).
+application's policy and names no app. The design is in `docs/`; start at `docs/README.md`.
 
 ## Scope and restraint
 
