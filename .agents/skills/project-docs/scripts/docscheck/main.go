@@ -8,7 +8,8 @@
 //   - a path in backticks in AGENTS.md or README.md that does not exist, is
 //     not git-ignored, and is not marked "(planned)";
 //   - a `make <target>` in a document that the Makefile lacks (skills vendored
-//     through .agents/skills/shared.sum are exempt: their targets are examples);
+//     through .agents/skills/shared.sum, docs/research/ and CHANGELOG.md are
+//     exempt: examples and dated records, not claims);
 //   - a required-Go-version claim in a root file that disagrees with go.mod;
 //   - a work-item identifier (story, epic, ticket) in a document or in code
 //     (skills are exempt: their examples may show one on purpose);
@@ -295,7 +296,9 @@ func (c *checker) checkMarkdown(path string) {
 				c.fail(path, n, "work-item id %q; describe the work, don't cite the tracker", m)
 			}
 		}
-		if len(c.targets) > 0 && !c.isShared(path) {
+		// A dated record (research, the changelog) describes the past; the
+		// targets it names are not claims about this Makefile.
+		if len(c.targets) > 0 && !c.isShared(path) && !inResearch && path != "CHANGELOG.md" {
 			var found [][]string
 			if inFence {
 				found = makeLineRe.FindAllStringSubmatch(line, -1)
