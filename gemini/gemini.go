@@ -49,8 +49,9 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 	model := cmp.Or(opts.Model, defaultGeminiModel)
 
 	client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
-		APIKey:  key,
-		Backend: genai.BackendGeminiAPI,
+		APIKey:     key,
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: opts.HTTPClient,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)

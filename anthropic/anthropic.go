@@ -59,6 +59,10 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 		clientOpts = append(clientOpts, option.WithBaseURL(baseURL))
 	}
 
+	if opts.HTTPClient != nil {
+		clientOpts = append(clientOpts, option.WithHTTPClient(opts.HTTPClient))
+	}
+
 	return &Provider{
 		client:   anthropic.NewClient(clientOpts...),
 		model:    cmp.Or(opts.Model, defaultAnthropicModel),

@@ -53,11 +53,19 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 
 	cfg := openai.DefaultConfig(key)
 	cfg.BaseURL = baseURL
-	cfg.HTTPClient = &http.Client{
-		Transport: &openRouterTransport{
-			base: cache.NewMarkTransport(http.DefaultTransport, opts.CacheTTL),
-		},
+	// A caller's client keeps its timeout, proxy and redirect policy; the
+	// gateway's headers and cache marks are layered over its transport.
+	httpClient := &http.Client{}
+	if opts.HTTPClient != nil {
+		copied := *opts.HTTPClient
+		httpClient = &copied
 	}
+	base := httpClient.Transport
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	httpClient.Transport = &openRouterTransport{base: cache.NewMarkTransport(base, opts.CacheTTL)}
+	cfg.HTTPClient = httpClient
 
 	return &Provider{
 		client:   openai.NewClientWithConfig(cfg),

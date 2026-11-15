@@ -86,7 +86,7 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 		return nil, fmt.Errorf("%s is not set", llm.CurrentApp().KeyVars("OPENAI_API_KEY"))
 	}
 	baseURL := cmp.Or(opts.BaseURL, os.Getenv(llm.CurrentApp().BaseURLVar()), opts.ConfigBaseURL, defaultResponsesBaseURL)
-	p := NewWith(nil, key, baseURL, cmp.Or(opts.Model, defaultResponsesModel), "openai-responses")
+	p := NewWith(opts.HTTPClient, key, baseURL, cmp.Or(opts.Model, defaultResponsesModel), "openai-responses")
 	p.SetStreamIdle(opts.StreamIdleSeconds)
 	return p, nil
 }

@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -377,3 +379,31 @@ const NestedArraySchema = `{"type":"object","properties":{` +
 	`"old_text":{"type":"string"},"new_text":{"type":"string"},` +
 	`"replace_all":{"type":"boolean"}},"required":["old_text","new_text"]}}},` +
 	`"required":["path"]}`
+
+// Recorder is an http.RoundTripper that answers every request with a 400 and
+// remembers the hosts it was asked for, so a test can prove a caller's client
+// carried a provider's traffic without any origin existing.
+type Recorder struct {
+	mu    sync.Mutex
+	hosts []string
+}
+
+func (r *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.mu.Lock()
+	r.hosts = append(r.hosts, req.URL.Host)
+	r.mu.Unlock()
+	return &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Status:     "400 Bad Request",
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"error":{"message":"recorded"}}`)),
+		Request:    req,
+	}, nil
+}
+
+// Hosts returns the hosts requested so far.
+func (r *Recorder) Hosts() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.hosts...)
+}

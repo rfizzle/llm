@@ -58,14 +58,24 @@ func NewChat(opts llm.ResolveOpts) (*Chat, error) {
 
 	cfg := openai.DefaultConfig(key)
 	cfg.BaseURL = baseURL
-	cfg.HTTPClient = &http.Client{Transport: NewPromptCacheTransport(http.DefaultTransport)}
+	// A caller's client keeps its timeout, proxy and redirect policy; the
+	// prompt-cache steering is layered over its transport. Decisions requests
+	// go through the same client, without that layer.
+	httpClient, decisionsClient := &http.Client{}, &http.Client{}
+	if opts.HTTPClient != nil {
+		copied := *opts.HTTPClient
+		httpClient = &copied
+		decisionsClient = opts.HTTPClient
+	}
+	httpClient.Transport = NewPromptCacheTransport(httpClient.Transport)
+	cfg.HTTPClient = httpClient
 
 	return &Chat{
 		client:    openai.NewClientWithConfig(cfg),
 		model:     model,
 		Deadline:  idle.Of(opts.StreamIdleSeconds),
 		classify:  failure.NewClassifier("openai", llm.CurrentApp().KeyVars("OPENAI_API_KEY"), key),
-		decisions: decisionsEndpoint{client: &http.Client{}, baseURL: baseURL, apiKey: key},
+		decisions: decisionsEndpoint{client: decisionsClient, baseURL: baseURL, apiKey: key},
 	}, nil
 }
 

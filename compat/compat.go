@@ -50,9 +50,14 @@ func New(opts llm.ResolveOpts) (*Provider, error) {
 
 	cfg := openai.DefaultConfig(key)
 	cfg.BaseURL = baseURL
+	httpc := http.DefaultClient
+	if opts.HTTPClient != nil {
+		cfg.HTTPClient = opts.HTTPClient
+		httpc = opts.HTTPClient
+	}
 	return &Provider{
 		client:   openai.NewClientWithConfig(cfg),
-		httpc:    http.DefaultClient,
+		httpc:    httpc,
 		apiKey:   key,
 		model:    model,
 		baseURL:  baseURL,
